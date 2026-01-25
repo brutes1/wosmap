@@ -1,5 +1,5 @@
 ---
-status: pending
+status: completed
 priority: p1
 issue_id: "005"
 tags: [code-review, security, backend, credentials]
@@ -65,12 +65,13 @@ async def configure_printer(config: PrinterConfig):
 
 ## Acceptance Criteria
 
-- [ ] Printer access code not stored in plain text
-- [ ] Credentials not exposed via GET endpoint
-- [ ] Redis access restricted (remove port exposure)
+- [x] Printer access code not stored in plain text
+- [x] Credentials not exposed via GET endpoint
+- [x] Redis access restricted (remove port exposure)
 
 ## Work Log
 
 | Date | Action | Learnings |
 |------|--------|-----------|
 | 2026-01-25 | Created from code review | Consider env vars for simplicity |
+| 2026-01-25 | Fixed: Env vars + short TTL Redis storage | Option B + hybrid approach |

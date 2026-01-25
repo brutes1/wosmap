@@ -51,10 +51,10 @@ services:
     restart: unless-stopped
 
   # Redis - Job queue and result storage
+  # Security: Redis only accessible within Docker network (no host port exposure)
   redis:
     image: redis:7-alpine
-    ports:
-      - "6379:6379"
+    # ports removed for security - Redis only accessible to other containers
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes

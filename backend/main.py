@@ -23,6 +23,12 @@ from geocoding import geocode_address, reverse_geocode
 REDIS_HOST = os.environ.get("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.environ.get("REDIS_PORT", 6379))
 MAPS_DIR = Path(os.environ.get("MAPS_DIR", "/data/maps"))
+ALLOWED_ORIGINS = os.environ.get("ALLOWED_ORIGINS", "http://localhost:8080").split(",")
+
+# Printer configuration from environment (more secure than Redis storage)
+PRINTER_IP = os.environ.get("PRINTER_IP")
+PRINTER_ACCESS_CODE = os.environ.get("PRINTER_ACCESS_CODE")
+PRINTER_SERIAL = os.environ.get("PRINTER_SERIAL")
 
 
 # Initialize FastAPI
@@ -33,9 +39,10 @@ app = FastAPI(
 )
 
 # CORS middleware for frontend
+# Security: Only allow specific origins (configured via ALLOWED_ORIGINS env var)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict to your frontend URL
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -248,6 +255,14 @@ async def download_map(job_id: str, file_type: str = "stl"):
         )
 
     file_path = Path(file_path)
+
+    # Security: Validate file is within MAPS_DIR to prevent path traversal
+    try:
+        if not file_path.resolve().is_relative_to(MAPS_DIR.resolve()):
+            raise HTTPException(status_code=403, detail="Access denied")
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Access denied")
+
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found on disk")
 
@@ -283,32 +298,75 @@ async def download_map(job_id: str, file_type: str = "stl"):
 
 @app.post("/api/printer/config")
 async def configure_printer(config: PrinterConfig):
-    """Configure the Bambu X1C printer for LAN printing."""
+    """
+    Configure the Bambu X1C printer for LAN printing.
+
+    Note: For production, set PRINTER_IP, PRINTER_ACCESS_CODE, and PRINTER_SERIAL
+    environment variables instead of using this endpoint.
+    """
+    # Security: Store minimal info in Redis (not the access code)
     r = get_redis()
-    r.set("printer_config", json.dumps(config.dict()))
-    return {"status": "configured", "message": "Printer configuration saved"}
+    r.set("printer_config", json.dumps({
+        "ip": config.ip,
+        "serial": config.serial,
+        # Access code stored separately or use env var
+        "configured_at": datetime.utcnow().isoformat(),
+    }))
+    # Store access code with short TTL (1 hour) for immediate use
+    r.setex(f"printer_access:{config.serial}", 3600, config.access_code)
+    return {"status": "configured", "message": "Printer configuration saved (access code expires in 1 hour)"}
+
+
+def get_printer_config() -> dict:
+    """
+    Get printer configuration from environment or Redis.
+    Environment variables take precedence for security.
+    """
+    # Prefer environment variables
+    if PRINTER_IP and PRINTER_ACCESS_CODE and PRINTER_SERIAL:
+        return {
+            "ip": PRINTER_IP,
+            "access_code": PRINTER_ACCESS_CODE,
+            "serial": PRINTER_SERIAL,
+        }
+
+    # Fall back to Redis
+    r = get_redis()
+    config = r.get("printer_config")
+    if config is None:
+        return None
+
+    data = json.loads(config)
+    # Get access code from separate key (with TTL)
+    access_code = r.get(f"printer_access:{data.get('serial')}")
+    if not access_code:
+        return None
+
+    return {
+        "ip": data["ip"],
+        "access_code": access_code,
+        "serial": data["serial"],
+    }
 
 
 @app.post("/api/printer/test")
 async def test_printer_connection():
     """Test connection to the configured printer."""
-    r = get_redis()
-    config = r.get("printer_config")
+    config = get_printer_config()
 
     if config is None:
         raise HTTPException(
             status_code=400,
-            detail="Printer not configured. Use POST /api/printer/config first."
+            detail="Printer not configured. Set PRINTER_* env vars or use POST /api/printer/config."
         )
 
     from printer import BambuPrinter, PrinterError
 
     try:
-        data = json.loads(config)
         printer = BambuPrinter(
-            ip=data["ip"],
-            access_code=data["access_code"],
-            serial=data["serial"]
+            ip=config["ip"],
+            access_code=config["access_code"],
+            serial=config["serial"]
         )
 
         # Try to get printer status
@@ -332,7 +390,7 @@ async def test_printer_connection():
 
 
 @app.get("/api/printer/config")
-async def get_printer_config():
+async def get_printer_config_endpoint():
     """Get the current printer configuration (without access code)."""
     r = get_redis()
     config = r.get("printer_config")
@@ -359,15 +417,15 @@ async def send_to_printer(job_id: str):
     2. Upload to printer via FTPS
     3. Start the print via MQTT
     """
-    r = get_redis()
-
     # Check printer is configured
-    printer_config = r.get("printer_config")
+    printer_config = get_printer_config()
     if printer_config is None:
         raise HTTPException(
             status_code=400,
-            detail="Printer not configured. Use POST /api/printer/config first."
+            detail="Printer not configured. Set PRINTER_* env vars or use POST /api/printer/config."
         )
+
+    r = get_redis()
 
     # Check job status
     result = r.get(f"result:{job_id}")
@@ -390,13 +448,11 @@ async def send_to_printer(job_id: str):
     # Import and use printer module
     from printer import slice_and_print, PrinterError
 
-    config = json.loads(printer_config)
-
     # Run the slice and print workflow
     try:
         result = slice_and_print(
             stl_path=stl_path,
-            printer_config=config,
+            printer_config=printer_config,
             profile_path=None  # Use default tactile map profile
         )
 

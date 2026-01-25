@@ -1,5 +1,5 @@
 ---
-status: pending
+status: completed
 priority: p1
 issue_id: "004"
 tags: [code-review, security, backend, printer]
@@ -62,9 +62,9 @@ def slice_stl(self, stl_path: str, output_path: str, ...):
 
 ## Acceptance Criteria
 
-- [ ] All file paths validated before subprocess execution
-- [ ] Paths must be within MAPS_DIR
-- [ ] File extensions validated
+- [x] All file paths validated before subprocess execution
+- [x] Paths must be within MAPS_DIR
+- [x] File extensions validated
 - [ ] Test with malicious path inputs
 
 ## Work Log
@@ -72,3 +72,4 @@ def slice_stl(self, stl_path: str, output_path: str, ...):
 | Date | Action | Learnings |
 |------|--------|-----------|
 | 2026-01-25 | Created from code review | List format subprocess safer but still validate |
+| 2026-01-25 | Fixed: Added validate_file_path() in printer.py | Option A implemented |

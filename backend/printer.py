@@ -34,6 +34,34 @@ class PrinterError(Exception):
     pass
 
 
+# Security: Define allowed directories for file operations
+MAPS_DIR = Path(os.environ.get("MAPS_DIR", "/data/maps"))
+
+
+def validate_file_path(file_path: str, allowed_dir: Path) -> Path:
+    """
+    Security: Validate that a file path is within the allowed directory.
+
+    Args:
+        file_path: Path to validate
+        allowed_dir: Directory that must contain the file
+
+    Returns:
+        Resolved Path object
+
+    Raises:
+        PrinterError: If path is outside allowed directory
+    """
+    path = Path(file_path)
+    try:
+        resolved = path.resolve()
+        if not resolved.is_relative_to(allowed_dir.resolve()):
+            raise PrinterError(f"Access denied: file must be within {allowed_dir}")
+        return resolved
+    except ValueError:
+        raise PrinterError("Access denied: invalid file path")
+
+
 class BambuPrinter:
     """
     Client for Bambu Lab X1C printer.
@@ -314,6 +342,25 @@ def slice_and_print(
     Returns:
         Result dictionary
     """
+    # Security: Validate STL path is within allowed directory
+    try:
+        validated_stl = validate_file_path(stl_path, MAPS_DIR)
+    except PrinterError as e:
+        return {"status": "security_error", "error": str(e)}
+
+    # Security: Validate profile path if provided
+    if profile_path:
+        try:
+            validate_file_path(profile_path, MAPS_DIR)
+        except PrinterError as e:
+            return {"status": "security_error", "error": str(e)}
+
+    # Validate file exists and has correct extension
+    if not validated_stl.exists():
+        return {"status": "error", "error": "STL file not found"}
+    if validated_stl.suffix.lower() != '.stl':
+        return {"status": "error", "error": "File must be an STL file"}
+
     printer = BambuPrinter(
         ip=printer_config["ip"],
         access_code=printer_config["access_code"],
@@ -323,11 +370,11 @@ def slice_and_print(
     # Create temp directory for sliced file
     with tempfile.TemporaryDirectory() as tmp_dir:
         # Slice STL to 3MF
-        stl_name = os.path.splitext(os.path.basename(stl_path))[0]
+        stl_name = validated_stl.stem
         gcode_path = os.path.join(tmp_dir, f"{stl_name}.gcode.3mf")
 
         try:
-            printer.slice_stl(stl_path, gcode_path, profile_path)
+            printer.slice_stl(str(validated_stl), gcode_path, profile_path)
         except PrinterError as e:
             return {"status": "slice_failed", "error": str(e)}
 

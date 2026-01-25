@@ -1,5 +1,5 @@
 ---
-status: pending
+status: completed
 priority: p1
 issue_id: "002"
 tags: [code-review, security, backend]
@@ -62,8 +62,8 @@ file_path = MAPS_DIR / job_id / f"map.{file_type}"
 
 ## Acceptance Criteria
 
-- [ ] File paths validated against MAPS_DIR before serving
-- [ ] Attempting to access files outside MAPS_DIR returns 403
+- [x] File paths validated against MAPS_DIR before serving
+- [x] Attempting to access files outside MAPS_DIR returns 403
 - [ ] Test with path traversal attempts (../../../etc/passwd)
 
 ## Work Log
@@ -71,3 +71,4 @@ file_path = MAPS_DIR / job_id / f"map.{file_type}"
 | Date | Action | Learnings |
 |------|--------|-----------|
 | 2026-01-25 | Created from code review | P1 security - blocks merge |
+| 2026-01-25 | Fixed: Added is_relative_to check | Option A implemented |

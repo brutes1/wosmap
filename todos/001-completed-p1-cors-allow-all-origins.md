@@ -1,5 +1,5 @@
 ---
-status: pending
+status: completed
 priority: p1
 issue_id: "001"
 tags: [code-review, security, backend]
@@ -62,8 +62,8 @@ app.add_middleware(
 
 ## Acceptance Criteria
 
-- [ ] CORS only allows specific frontend origins
-- [ ] Configuration works for both dev and production
+- [x] CORS only allows specific frontend origins
+- [x] Configuration works for both dev and production
 - [ ] Verify cross-origin requests from other domains are blocked
 
 ## Work Log
@@ -71,3 +71,4 @@ app.add_middleware(
 | Date | Action | Learnings |
 |------|--------|-----------|
 | 2026-01-25 | Created from code review | Critical security issue |
+| 2026-01-25 | Fixed: Added ALLOWED_ORIGINS env var | Option B implemented |

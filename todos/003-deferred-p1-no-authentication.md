@@ -1,5 +1,5 @@
 ---
-status: pending
+status: deferred
 priority: p1
 issue_id: "003"
 tags: [code-review, security, backend, authentication]
@@ -75,3 +75,4 @@ async def create_map(request: MapRequest, _: str = Depends(verify_api_key)):
 | Date | Action | Learnings |
 |------|--------|-----------|
 | 2026-01-25 | Created from code review | Decide auth strategy based on use case |
+| 2026-01-25 | Deferred: Requires architecture decision | Mitigated by CORS fix, rate limiting planned |
