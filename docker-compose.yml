@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  # Frontend - Vue 3 app served by nginx
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Backend - FastAPI REST API
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - MAPS_DIR=/data/maps
+    volumes:
+      - map_data:/data/maps
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # Converter - OSM to STL processing worker
+  converter:
+    build:
+      context: .
+      dockerfile: converter/Dockerfile
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - WORK_DIR=/data/maps
+    volumes:
+      - map_data:/data/maps
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+    restart: unless-stopped
+
+  # Redis - Job queue and result storage
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  map_data:
+    driver: local
+  redis_data:
+    driver: local

@@ -1,0 +1,23 @@
+{
+  "name": "Tactile Map Profile",
+  "description": "Optimized settings for 3D printing tactile maps",
+  "layer_height": 0.2,
+  "first_layer_height": 0.25,
+  "line_width": 0.45,
+  "wall_loops": 3,
+  "top_shell_layers": 4,
+  "bottom_shell_layers": 3,
+  "sparse_infill_density": "15%",
+  "sparse_infill_pattern": "grid",
+  "top_surface_pattern": "monotonic",
+  "bottom_surface_pattern": "monotonic",
+  "enable_support": false,
+  "brim_type": "auto_brim",
+  "brim_width": 5,
+  "skirt_loops": 1,
+  "skirt_distance": 5,
+  "print_sequence": "by_layer",
+  "slow_down_for_layer_cooling": true,
+  "fan_cooling_layer_time": 60,
+  "notes": "Tactile maps have fine details - use 0.2mm layers for good resolution. Buildings are 2.9mm tall, roads are 0.82-1.5mm. No supports needed for typical maps."
+}

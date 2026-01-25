@@ -460,25 +460,25 @@ def fetch_microsoft_buildings(bbox: tuple) -> list:
 ## Acceptance Criteria
 
 ### Functional Requirements
-- [ ] User can enter address OR GPS coordinates
-- [ ] User can set scale (default 1:3463) and size (default 23cm)
-- [ ] User can toggle building inclusion
-- [ ] User can select data source (OSM or OSM+Microsoft)
-- [ ] System generates valid STL file for 3D printing
-- [ ] User can download generated STL
-- [ ] User can configure Bambu X1C printer (IP, access code, serial)
-- [ ] User can send STL directly to configured printer
+- [x] User can enter address OR GPS coordinates
+- [x] User can set scale (default 1:3463) and size (default 23cm)
+- [x] User can toggle building inclusion
+- [x] User can select data source (OSM or OSM+Microsoft)
+- [x] System generates valid STL file for 3D printing
+- [x] User can download generated STL
+- [x] User can configure Bambu X1C printer (IP, access code, serial)
+- [x] User can send STL directly to configured printer
 
 ### Non-Functional Requirements
-- [ ] All components run in Docker containers
-- [ ] Works offline once map data is cached
-- [ ] Conversion completes within 5 minutes for typical map sizes
-- [ ] Frontend responsive on desktop browsers
+- [x] All components run in Docker containers
+- [ ] Works offline once map data is cached (requires caching implementation)
+- [x] Conversion completes within 5 minutes for typical map sizes (tested: 16 seconds)
+- [x] Frontend responsive on desktop browsers
 
 ### Quality Gates
-- [ ] docker-compose up starts all services successfully
-- [ ] End-to-end test: address → STL download works
-- [ ] Printer integration tested with actual X1C
+- [x] docker-compose up starts all services successfully (all 4 services healthy)
+- [x] End-to-end test: address → STL download works (Paris test: 13MB STL in 16s)
+- [ ] Printer integration tested with actual X1C (requires hardware)
 
 ## Dependencies & Risks
 
