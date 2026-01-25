@@ -84,9 +84,17 @@
       <!-- Status -->
       <section v-if="status" class="card status-card" :class="statusClass">
         <h3>Status</h3>
-        <p class="status-message">{{ statusMessage }}</p>
-        <div v-if="isProcessing" class="progress-bar">
-          <div class="progress-bar-fill"></div>
+        <p class="status-message">{{ stageMessage || statusMessage }}</p>
+        <div v-if="isProcessing" class="progress-stages">
+          <div
+            v-for="stage in stages"
+            :key="stage.id"
+            class="stage"
+            :class="{ active: currentStage === stage.id, done: isStageCompleted(stage.id) }"
+          >
+            <span class="stage-icon">{{ isStageCompleted(stage.id) ? 'done' : (currentStage === stage.id ? 'pending' : 'radio_button_unchecked') }}</span>
+            <span class="stage-label">{{ stage.label }}</span>
+          </div>
         </div>
         <p v-if="error" class="error">{{ error }}</p>
       </section>
@@ -94,6 +102,16 @@
       <!-- Results -->
       <section v-if="completed" class="card results-card">
         <h3>Map Ready</h3>
+
+        <div v-if="fileInfo" class="file-details">
+          <p class="filename">{{ fileInfo.filename }}</p>
+          <div class="file-stats">
+            <span><strong>Size:</strong> {{ fileInfo.size_human }}</span>
+            <span><strong>Triangles:</strong> {{ formatNumber(fileInfo.triangles) }}</span>
+            <span><strong>Dimensions:</strong> {{ fileInfo.dimensions?.x_mm }} x {{ fileInfo.dimensions?.y_mm }} x {{ fileInfo.dimensions?.z_mm }} mm</span>
+          </div>
+        </div>
+
         <div class="button-row">
           <a :href="downloadUrl" class="btn-secondary" download>
             Download STL
@@ -196,6 +214,18 @@ export default {
       jobId: null,
       completed: false,
       isProcessing: false,
+      currentStage: null,
+      stageMessage: null,
+      fileInfo: null,
+
+      // Processing stages
+      stages: [
+        { id: 'queued', label: 'Queued' },
+        { id: 'fetching_osm', label: 'Fetching OSM' },
+        { id: 'fetching_overture', label: 'Fetching Overture' },
+        { id: 'converting', label: 'Converting' },
+        { id: 'finalizing', label: 'Finalizing' },
+      ],
 
       // Printer
       showPrinterModal: false,
@@ -215,7 +245,10 @@ export default {
       if (!this.status) return ''
       switch (this.status) {
         case 'queued': return 'Job queued, waiting for worker...'
-        case 'processing': return 'Generating tactile map...'
+        case 'fetching_osm': return 'Fetching map data from OpenStreetMap...'
+        case 'fetching_overture': return 'Fetching building data from Overture Maps...'
+        case 'converting': return 'Converting to 3D model...'
+        case 'finalizing': return 'Computing file metadata...'
         case 'completed': return 'Map generation complete!'
         case 'failed': return 'Map generation failed'
         default: return this.status
@@ -223,10 +256,11 @@ export default {
     },
 
     statusClass() {
+      const processingStages = ['queued', 'fetching_osm', 'fetching_overture', 'converting', 'finalizing']
       return {
         'status-completed': this.status === 'completed',
         'status-failed': this.status === 'failed',
-        'status-processing': this.status === 'queued' || this.status === 'processing',
+        'status-processing': processingStages.includes(this.status),
       }
     },
 
@@ -242,6 +276,9 @@ export default {
       this.completed = false
       this.isProcessing = true
       this.status = 'queued'
+      this.currentStage = 'queued'
+      this.stageMessage = null
+      this.fileInfo = null
 
       try {
         const params = {
@@ -257,10 +294,16 @@ export default {
         const response = await createMap(params)
         this.jobId = response.job_id
 
-        // Poll for completion
-        const result = await pollUntilComplete(this.jobId)
+        // Poll for completion with status callback
+        const result = await pollUntilComplete(this.jobId, (statusData) => {
+          this.status = statusData.status
+          this.currentStage = statusData.status
+          this.stageMessage = statusData.stage_message
+        })
+
         this.status = 'completed'
         this.completed = true
+        this.fileInfo = result.file_info
 
       } catch (err) {
         this.status = 'failed'
@@ -268,6 +311,18 @@ export default {
       } finally {
         this.isProcessing = false
       }
+    },
+
+    isStageCompleted(stageId) {
+      const stageOrder = this.stages.map(s => s.id)
+      const currentIndex = stageOrder.indexOf(this.currentStage)
+      const stageIndex = stageOrder.indexOf(stageId)
+      return stageIndex < currentIndex
+    },
+
+    formatNumber(num) {
+      if (num === null || num === undefined) return '-'
+      return num.toLocaleString()
     },
 
     async savePrinterAndPrint() {
@@ -451,30 +506,47 @@ header h1 {
   border-left: 4px solid #dc3545;
 }
 
-.progress-bar {
-  height: 4px;
-  background: #eee;
-  border-radius: 2px;
-  margin-top: 12px;
-  overflow: hidden;
-}
-
-.progress-bar-fill {
-  height: 100%;
-  background: #4a90d9;
-  width: 100%;
-  animation: progress 1.5s ease-in-out infinite;
-}
-
-@keyframes progress {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
 .error {
   color: #dc3545;
   font-size: 14px;
   margin-top: 8px;
+}
+
+.progress-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #f5f5f5;
+  border-radius: 16px;
+  font-size: 12px;
+  color: #999;
+}
+
+.stage.active {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.stage.done {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+
+.stage-icon {
+  font-family: 'Material Icons', sans-serif;
+  font-size: 14px;
+}
+
+.stage-label {
+  font-weight: 500;
 }
 
 .results-card {
@@ -486,6 +558,38 @@ header h1 {
 .results-card h3 {
   color: #28a745;
   margin-bottom: 16px;
+}
+
+.file-details {
+  margin-bottom: 16px;
+  text-align: left;
+  background: #f9f9f9;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.filename {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.file-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #666;
+}
+
+.file-stats span {
+  white-space: nowrap;
+}
+
+.file-stats strong {
+  color: #444;
 }
 
 /* Modal */

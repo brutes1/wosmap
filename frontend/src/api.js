@@ -91,10 +91,19 @@ export async function sendToPrinter(jobId) {
 
 /**
  * Poll for job completion.
+ * @param {string} jobId - The job ID to poll
+ * @param {function} onStatusUpdate - Optional callback called with status object on each poll
+ * @param {number} interval - Polling interval in ms (default 2000)
+ * @param {number} maxAttempts - Maximum poll attempts (default 300)
  */
-export async function pollUntilComplete(jobId, interval = 2000, maxAttempts = 300) {
+export async function pollUntilComplete(jobId, onStatusUpdate = null, interval = 2000, maxAttempts = 300) {
   for (let i = 0; i < maxAttempts; i++) {
     const status = await getMapStatus(jobId)
+
+    // Call the status update callback if provided
+    if (onStatusUpdate) {
+      onStatusUpdate(status)
+    }
 
     if (status.status === 'completed') {
       return status

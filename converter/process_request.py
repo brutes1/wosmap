@@ -26,7 +26,7 @@ def calculate_diameter_from_scale_and_size(scale: int, size_cm: float) -> int:
     return int(diameter_m)
 
 
-def process_map_request(job: dict, work_dir: str = "/data/maps") -> dict:
+def process_map_request(job: dict, work_dir: str = "/data/maps", status_callback=None) -> dict:
     """
     Process a map generation request.
 
@@ -38,11 +38,19 @@ def process_map_request(job: dict, work_dir: str = "/data/maps") -> dict:
             - scale: Map scale (default 3463)
             - size_cm: Print size in cm (default 23)
             - include_buildings: Whether to include buildings
-            - data_source: "osm" or "osm_ms"
+            - data_source: "osm" or "overture"
+        work_dir: Working directory for output files
+        status_callback: Optional callback(stage, message) for progress updates
 
     Returns:
         Result dictionary with status and output file paths
     """
+    def update_stage(stage: str, message: str = None):
+        """Update processing stage via callback and print."""
+        if status_callback:
+            status_callback(stage, message)
+        print(f"Stage: {stage}" + (f" - {message}" if message else ""))
+
     job_id = job["id"]
     lat = job["latitude"]
     lon = job["longitude"]
@@ -50,6 +58,7 @@ def process_map_request(job: dict, work_dir: str = "/data/maps") -> dict:
     size_cm = job.get("size_cm", 23.0)
     include_buildings = job.get("include_buildings", True)
     data_source = job.get("data_source", "osm")
+    location_name = job.get("location_name", "map")
 
     # Create job directory
     job_dir = Path(work_dir) / job_id
@@ -72,18 +81,26 @@ def process_map_request(job: dict, work_dir: str = "/data/maps") -> dict:
     print(f"  Scale: 1:{scale}, Size: {size_cm}cm, Diameter: {diameter}m")
     print(f"  Bounding box: {bbox}")
 
-    # Step 1: Fetch OSM data (and optionally Overture buildings)
-    print("Step 1: Fetching map data...")
+    # Step 1: Fetch OSM data
+    update_stage("fetching_osm", "Fetching map data from OpenStreetMap...")
     osm_path = job_dir / "map.osm"
     try:
-        osm_data = get_map_data(lat, lon, diameter, data_source, work_dir=str(job_dir))
-        osm_path.write_text(osm_data)
+        # If using Overture, update stage before fetching
+        if data_source in ("overture", "osm_ms"):
+            osm_data = get_map_data(lat, lon, diameter, "osm", work_dir=str(job_dir))
+            osm_path.write_text(osm_data)
+            update_stage("fetching_overture", "Fetching building data from Overture Maps...")
+            osm_data = get_map_data(lat, lon, diameter, data_source, work_dir=str(job_dir))
+            osm_path.write_text(osm_data)
+        else:
+            osm_data = get_map_data(lat, lon, diameter, data_source, work_dir=str(job_dir))
+            osm_path.write_text(osm_data)
         print(f"  Saved OSM data to {osm_path} ({len(osm_data)} bytes)")
     except Exception as e:
         raise Exception(f"Failed to fetch map data: {e}")
 
     # Step 2: Run osm-to-tactile.py (which calls OSM2World + Blender)
-    print("Step 2: Converting OSM to STL...")
+    update_stage("converting", "Converting to 3D model (OSM2World)...")
     converter_dir = Path(__file__).parent
 
     args = [
@@ -120,7 +137,9 @@ def process_map_request(job: dict, work_dir: str = "/data/maps") -> dict:
     except subprocess.TimeoutExpired:
         raise Exception("Conversion timed out after 10 minutes")
 
-    # Step 3: Verify output files exist
+    # Step 3: Finalize and collect metadata
+    update_stage("finalizing", "Computing file metadata...")
+
     stl_path = job_dir / "map.stl"
     if not stl_path.exists():
         raise Exception(f"STL file not generated at {stl_path}")
@@ -142,10 +161,22 @@ def process_map_request(job: dict, work_dir: str = "/data/maps") -> dict:
     if meta_path.exists():
         metadata = json.loads(meta_path.read_text())
 
+    # Get STL file info
+    from stl_utils import get_stl_info
+    from datetime import datetime
+
+    stl_info = get_stl_info(str(stl_path))
+    date_str = datetime.utcnow().strftime("%Y-%m-%d")
+    filename = f"wosmap_{location_name}_{date_str}.stl"
+
     return {
         "status": "completed",
         "job_id": job_id,
         "files": output_files,
+        "file_info": {
+            "filename": filename,
+            **stl_info
+        },
         "metadata": metadata,
         "effective_area": effective_area,
     }

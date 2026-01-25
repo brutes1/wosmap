@@ -49,6 +49,13 @@ def update_job_status(r: redis.Redis, job_id: str, status: str, data: dict = Non
     r.set(f"result:{job_id}", json.dumps(result))
 
 
+def make_status_callback(r: redis.Redis, job_id: str):
+    """Create a callback function for updating job processing stage."""
+    def update_stage(stage: str, message: str = None):
+        update_job_status(r, job_id, stage, {"stage_message": message} if message else None)
+    return update_stage
+
+
 def main():
     global shutdown_requested
 
@@ -88,11 +95,11 @@ def main():
                 job_id = job.get("id", "unknown")
                 print(f"Job ID: {job_id}")
 
-                # Update status to processing
-                update_job_status(r, job_id, "processing")
+                # Create status callback for granular updates
+                status_callback = make_status_callback(r, job_id)
 
-                # Process the job
-                result = process_map_request(job, WORK_DIR)
+                # Process the job with status callback
+                result = process_map_request(job, WORK_DIR, status_callback=status_callback)
 
                 # Update status to completed
                 update_job_status(r, job_id, "completed", result)

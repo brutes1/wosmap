@@ -90,9 +90,11 @@ class JobStatus(BaseModel):
     """Status of a map generation job."""
     job_id: str
     status: str
+    stage_message: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     files: Optional[dict] = None
+    file_info: Optional[dict] = None
     error: Optional[str] = None
     metadata: Optional[dict] = None
 
