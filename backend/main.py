@@ -270,6 +270,48 @@ async def configure_printer(config: PrinterConfig):
     return {"status": "configured", "message": "Printer configuration saved"}
 
 
+@app.post("/api/printer/test")
+async def test_printer_connection():
+    """Test connection to the configured printer."""
+    r = get_redis()
+    config = r.get("printer_config")
+
+    if config is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Printer not configured. Use POST /api/printer/config first."
+        )
+
+    from printer import BambuPrinter, PrinterError
+
+    try:
+        data = json.loads(config)
+        printer = BambuPrinter(
+            ip=data["ip"],
+            access_code=data["access_code"],
+            serial=data["serial"]
+        )
+
+        # Try to get printer status
+        status = printer.get_status()
+        return {
+            "status": "connected",
+            "message": "Successfully connected to printer",
+            "printer_status": status
+        }
+
+    except PrinterError as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Connection test failed: {str(e)}"
+        }
+
+
 @app.get("/api/printer/config")
 async def get_printer_config():
     """Get the current printer configuration (without access code)."""
@@ -326,17 +368,42 @@ async def send_to_printer(job_id: str):
     if stl_path is None:
         raise HTTPException(status_code=404, detail="STL file not found")
 
-    # TODO: Implement actual printer integration
-    # This would:
-    # 1. Call OrcaSlicer CLI to slice the STL
-    # 2. Upload the sliced file to the printer
-    # 3. Start the print
+    # Import and use printer module
+    from printer import slice_and_print, PrinterError
 
-    return {
-        "status": "not_implemented",
-        "message": "Printer integration is not yet fully implemented. STL file is ready for manual printing.",
-        "stl_path": stl_path,
-    }
+    config = json.loads(printer_config)
+
+    # Run the slice and print workflow
+    try:
+        result = slice_and_print(
+            stl_path=stl_path,
+            printer_config=config,
+            profile_path=None  # Use default tactile map profile
+        )
+
+        if result.get("status") in ["slice_failed", "upload_failed", "print_failed"]:
+            raise HTTPException(
+                status_code=500,
+                detail=result.get("error", "Printing failed")
+            )
+
+        return {
+            "status": "sent_to_printer",
+            "message": "Print job sent to Bambu X1C",
+            "job_id": job_id,
+            "printer_result": result,
+        }
+
+    except PrinterError as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Printer error: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {str(e)}"
+        )
 
 
 # ============================================
