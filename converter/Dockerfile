@@ -54,16 +54,14 @@ RUN apt-get update && apt-get install -y \
 RUN pip3 install --no-cache-dir \
     redis \
     requests \
-    cairosvg
+    cairosvg \
+    svgwrite
 
-# Download and install Blender (LTS version for stability)
-ENV BLENDER_VERSION=3.6.5
-ENV BLENDER_URL=https://download.blender.org/release/Blender3.6/blender-${BLENDER_VERSION}-linux-x64.tar.xz
-RUN wget -q ${BLENDER_URL} -O /tmp/blender.tar.xz \
-    && mkdir -p /opt/blender \
-    && tar -xf /tmp/blender.tar.xz -C /opt/blender --strip-components=1 \
-    && rm /tmp/blender.tar.xz \
-    && ln -s /opt/blender/blender /usr/local/bin/blender
+# Install Blender from Ubuntu repository (supports ARM64)
+# Note: Ubuntu 22.04 provides Blender 3.0, which is older but works on ARM64
+RUN apt-get update && apt-get install -y \
+    blender \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set up app directory
 WORKDIR /app
@@ -78,7 +76,7 @@ COPY converter/*.py /app/converter/
 
 # Set environment variables
 ENV OSM2WORLD_JAR=/app/OSM2World.jar
-ENV BLENDER_PATH=/usr/local/bin/blender
+ENV BLENDER_PATH=/usr/bin/blender
 ENV REDIS_HOST=redis
 ENV REDIS_PORT=6379
 ENV WORK_DIR=/data/maps

@@ -51,10 +51,10 @@ def do_cmdline():
 
 def print_verts(ob):
     for v in ob.data.vertices:
-        print(ob.name, ob.matrix_world * mathutils.Vector(v.co))
+        print(ob.name, ob.matrix_world @mathutils.Vector(v.co))
 
 def get_minimum_coordinate(ob):
-    bbox_corners = [ob.matrix_world * mathutils.Vector(corner) for corner in ob.bound_box]
+    bbox_corners = [ob.matrix_world @mathutils.Vector(corner) for corner in ob.bound_box]
     min_x = 1000000
     min_y = 1000000
     min_z = 1000000
@@ -128,7 +128,7 @@ def add_road_overlay_object(dwg, main_g, ob):
             add_polygons(dwg, g, ob)
 
 def export_svg(base_path, args):
-    t = time.clock()
+    t = time.perf_counter()
     min_x, min_y, max_x, max_y = (args.min_x, args.min_y, args.max_x, args.max_y)
     one_cm_units = (max_y - min_y) / args.size
 
@@ -209,7 +209,7 @@ def export_svg(base_path, args):
     dwg.add(g)
 
     dwg.save()
-    print("creating SVG took " + (str(time.clock() - t)))
+    print("creating SVG took " + (str(time.perf_counter() - t)))
 
 def _export_stl(stl_path, scale):
     print("creating {stl}...".format(stl=stl_path))
@@ -223,7 +223,7 @@ def export_stl(base_path, scale):
 def export_stl_separate(base_path, scale):
     bpy.ops.object.select_all(action='DESELECT')
     for ob in bpy.context.scene.objects:
-        ob.select = ob.name.endswith('Roads') or ob.name.endswith('RoadAreas') or ob.name.endswith('Rails')
+        ob.select_set(ob.name.endswith('Roads') or ob.name.endswith('RoadAreas') or ob.name.endswith('Rails'))
     _export_stl(base_path + '-ways.stl', scale)
     bpy.ops.object.select_all(action='INVERT')
     _export_stl(base_path + '-rest.stl', scale)
@@ -242,7 +242,7 @@ def create_cube(min_x, min_y, max_x, max_y, min_z, max_z):
     bpy.ops.object.mode_set(mode = 'OBJECT')
     cube.location = [ (min_x + max_x) / 2, (min_y + max_y) / 2, (min_z + max_z) / 2 ]
     cube.scale = [ (max_x - min_x) / 2, (max_y - min_y) / 2, (max_z - min_z) / 2 ]
-    bpy.context.scene.update() # flush changes to location and scale
+    bpy.context.view_layer.update() # flush changes to location and scale
     return cube
 
 def add_borders(min_x, min_y, max_x, max_y, width, bottom, height, corner_height):
@@ -291,9 +291,9 @@ def remove_everything():
 
 # Import given file as .obj and return it
 def import_obj_file(obj_path):
-    t = time.clock()
+    t = time.perf_counter()
     bpy.ops.import_scene.obj(filepath=obj_path, axis_forward='-Z', axis_up='Y')
-    print("importing STL took " + (str(time.clock() - t)))
+    print("importing STL took " + (str(time.perf_counter() - t)))
 
 # Extrude floor to a flat-roofed building
 def extrude_building(ob, height):
@@ -307,7 +307,7 @@ def extrude_building(ob, height):
 def clip_object_to_map(ob, min_co, max_co):
     try:
         #print("Clipping {}".format(ob.name))
-        bpy.context.scene.objects.active = ob
+        bpy.context.view_layer.objects.active = ob
         bpy.ops.object.mode_set(mode = 'EDIT')
 
         # Clip from all sides
@@ -326,8 +326,8 @@ def clip_object_to_map(ob, min_co, max_co):
         warning("Failed to clip {}: {}".format(ob.name, str(e)))
         bpy.ops.object.mode_set(mode = 'OBJECT')
         bpy.ops.object.select_all(action='DESELECT')
-        ob.select = True
-        bpy.context.scene.objects.active = ob
+        ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
         try:
             bpy.ops.object.delete()
         except Exception as e:
@@ -336,7 +336,7 @@ def clip_object_to_map(ob, min_co, max_co):
 
 def join_selected(name):
     combined = bpy.context.selected_objects[0]
-    bpy.context.scene.objects.active = combined
+    bpy.context.view_layer.objects.active = combined
     combined.name = name
     bpy.ops.object.join()
     return combined
@@ -346,7 +346,7 @@ def join_objects(objects, name):
         return None
     bpy.ops.object.select_all(action='DESELECT')
     for ob in objects:
-        ob.select = True
+        ob.select_set(True)
     return join_selected(name)
 
 def join_and_clip(objects, min_co, max_co, name):
@@ -358,7 +358,7 @@ def join_and_clip(objects, min_co, max_co, name):
 
 def raise_ob(objs, height):
     bpy.ops.object.select_all(action='DESELECT')
-    bpy.context.scene.objects.active = objs
+    bpy.context.view_layer.objects.active = objs
     bpy.ops.object.mode_set(mode = 'EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.extrude_region_move(TRANSFORM_OT_translate={ "value": (0.0, 0.0, height) })
@@ -366,7 +366,7 @@ def raise_ob(objs, height):
 
 def water_remesh_and_extrude(object, extrude_height):
     # Extrude just enough that remeshing works
-    bpy.context.scene.objects.active = object
+    bpy.context.view_layer.objects.active = object
     bpy.ops.object.mode_set(mode = 'EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.mesh.extrude_region_move(TRANSFORM_OT_translate={ "value": (0.0, 0.0, extrude_height) })
@@ -379,7 +379,10 @@ def water_remesh_and_extrude(object, extrude_height):
     modifier = object.modifiers.new('Modifier', 'REMESH')
     modifier.octree_depth = math.ceil(depth)
     modifier.use_remove_disconnected = False
-    bpy.ops.object.modifier_apply(apply_as='DATA', modifier=modifier.name)
+    try:
+        bpy.ops.object.modifier_apply(modifier=modifier.name)
+    except RuntimeError as e:
+        print(f"Warning: Could not apply remesh modifier: {e}")
 
 def water_wave_pattern(object, depth, scale):
     extrude_height = 1.0
@@ -408,7 +411,7 @@ def water_wave_pattern(object, depth, scale):
             v.co.y = max(min_height, (math.sin(v.co.x * density) + math.sin(v.co.z * density)) * depth / 4 + depth / 2)
         else:
             v.co.y = 0
-    bmesh.update_edit_mesh(object.data, tessface=False, destructive=False)
+    bmesh.update_edit_mesh(object.data, destructive=False)
 
     bpy.ops.object.mode_set(mode = 'OBJECT')
 
@@ -434,7 +437,7 @@ def join_matching_edges(ob, min_x, min_y, max_x, max_y):
     dt = 0.15  # max distance 
     at = 0.5  # max sin(angle)  (30°)
     
-    bpy.context.scene.objects.active = ob
+    bpy.context.view_layer.objects.active = ob
     bpy.ops.object.mode_set(mode = 'EDIT')
     bpy.ops.mesh.select_all(action='DESELECT')
     from math import sin
@@ -556,21 +559,24 @@ def join_matching_edges(ob, min_x, min_y, max_x, max_y):
             
     print("%s: melding %d out of %d edges" % (ob.name, len(to_weld) / 2, len(bm.edges)))
     bmesh.ops.weld_verts(bm, targetmap = to_weld)
-    bmesh.update_edit_mesh(bpy.context.object.data ,True)
+    bmesh.update_edit_mesh(bpy.context.object.data)
     bpy.ops.object.mode_set(mode = 'OBJECT')
 
 # Decimating gets rid of useless and harmful lane edges, as well as changing
 # tris to n-gons (important to find edge's "direction")
 def decimate(ob):
     # Decimating gets rid of useless lanes
-    bpy.context.scene.objects.active = ob
+    bpy.context.view_layer.objects.active = ob
     modifier = ob.modifiers.new('Modifier', 'DECIMATE')
     modifier.decimate_type = 'DISSOLVE'
-    bpy.ops.object.modifier_apply(apply_as='DATA', modifier=modifier.name)
+    try:
+        bpy.ops.object.modifier_apply(modifier=modifier.name)
+    except RuntimeError as e:
+        print(f"Warning: Could not apply decimate modifier: {e}")
 
 # Fatten slightly to cause overlap and avoid faces too close to each other
 def fatten(ob):
-    bpy.context.scene.objects.active = ob
+    bpy.context.view_layer.objects.active = ob
     bpy.ops.object.mode_set(mode = 'EDIT')
     bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.transform.shrink_fatten(value=-0.05) # less than this and programs start to "remove double vertices"
@@ -579,24 +585,24 @@ def fatten(ob):
 def do_ways(ways, height, min_x, min_y, max_x, max_y):
     if ways == None:
         return
-    t = time.clock()
+    t = time.perf_counter()
     decimate(ways)
     join_matching_edges(ways, min_x, min_y, max_x, max_y)
     raise_ob(ways, height)
     fatten(ways)
-    print("processing %s took %.2f" % (ways.name, time.clock() - t))
+    print("processing %s took %.2f" % (ways.name, time.perf_counter() - t))
 
 def do_road_areas(roads, height):
     if roads == None:
         return
-    t = time.clock()
+    t = time.perf_counter()
     decimate(roads)
     raise_ob(roads, height)
     fatten(roads)
-    #print("processing %s took %.2f" % (roads.name, time.clock() - t))
+    #print("processing %s took %.2f" % (roads.name, time.perf_counter() - t))
 
 def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
-    t = time.clock()
+    t = time.perf_counter()
     mm_to_units = scale / 1000
     if not no_borders:
         space = (BORDER_WIDTH_MM - BORDER_HORIZONTAL_OVERLAP_MM) * mm_to_units 
@@ -642,7 +648,7 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
             n_total = len(ob.data.vertices)
             n_outside = 0
             for vert in ob.data.vertices:
-                vx, vy, vz = ((ob.matrix_world * vert.co))
+                vx, vy, vz = ((ob.matrix_world @vert.co))
                 if vx < min_x or vx > max_x or vy < min_y or vy > max_y:
                     n_outside = n_outside + 1
 
@@ -662,16 +668,16 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
                     clippable_water_areas.append(ob)
                 else:
                     print("UNHANDLED CLIPPABLE OBJECT TYPE: " + ob.name)
-    print("initial steps took %.2f" % (time.clock() - t))
+    print("initial steps took %.2f" % (time.perf_counter() - t))
 
     # Delete
-    t = time.clock()
+    t = time.perf_counter()
     if len(deleteables) > 0:
         bpy.ops.object.select_all(action='DESELECT')
         for ob in deleteables:
-            ob.select = True
+            ob.select_set(True)
         bpy.ops.object.delete()
-        #print("deleting %d objects took %.2f" % (len(deleteables), time.clock() - t))
+        #print("deleting %d objects took %.2f" % (len(deleteables), time.perf_counter() - t))
 
     # Pre-join stuff for performance
     joined_roads_car = join_and_clip(roads_car, min_co, max_co, 'CarRoads')
@@ -684,13 +690,13 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
     # Buildings
     print('META-START:{"buildingCount":%d}:META-END\n' % (len(buildings)))
     if joined_buildings:
-        t = time.clock()
+        t = time.perf_counter()
         extrude_building(joined_buildings, BUILDING_HEIGHT_MM * mm_to_units)
         fatten(joined_buildings)
-        print("processing %d buildings took %.2f" % (len(buildings), time.clock() - t))
+        print("processing %d buildings took %.2f" % (len(buildings), time.perf_counter() - t))
 
     # Waters
-    t = time.clock()
+    t = time.perf_counter()
     if len(joinable_waterways) > 0:
         joined_waterways = join_objects(joinable_waterways, 'JoinedWaterways')
         raise_ob(joined_waterways, WATERWAY_DEPTH_MM * mm_to_units)
@@ -706,7 +712,7 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
         for water in inner_water_areas:
             water_wave_pattern(water, WATER_AREA_DEPTH_MM * mm_to_units, scale)
         join_objects(inner_water_areas, 'InnerWaterAreas')
-    print("processing waters took %.2f" % (time.clock() - t))
+    print("processing waters took %.2f" % (time.perf_counter() - t))
 
     # Rails
     if clipped_rails != None:
@@ -719,11 +725,11 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
     do_ways(joined_roads_ped, ROAD_HEIGHT_PEDESTRIAN_MM * mm_to_units, min_x, min_y, max_x, max_y)
 
 def make_tactile_map(args):
-    t = time.clock()
+    t = time.perf_counter()
     min_x, min_y, max_x, max_y = (args.min_x, args.min_y, args.max_x, args.max_y)
 
     process_objects(min_x, min_y, max_x, max_y, args.scale, args.no_borders)
-    print("process_objects() took " + (str(time.clock() - t)))
+    print("process_objects() took " + (str(time.perf_counter() - t)))
 
     # Create the support cube and borders
     base_cube = create_bounds(min_x, min_y, max_x, max_y, args.scale, args.no_borders)

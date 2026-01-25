@@ -29,21 +29,22 @@ def fetch_osm_data(bbox: tuple, timeout: int = 180) -> str:
     lat_min, lon_min, lat_max, lon_max = bbox
 
     # Overpass uses (south, west, north, east) = (lat_min, lon_min, lat_max, lon_max)
+    # Use 'out meta' to include version/changeset attributes that OSM2World requires
     query = f"""
-    [out:xml][timeout:{timeout}];
+    [out:xml][timeout:{timeout}][bbox:{lat_min},{lon_min},{lat_max},{lon_max}];
     (
-      way["building"]({lat_min},{lon_min},{lat_max},{lon_max});
-      way["highway"]({lat_min},{lon_min},{lat_max},{lon_max});
-      way["railway"]({lat_min},{lon_min},{lat_max},{lon_max});
-      way["waterway"]({lat_min},{lon_min},{lat_max},{lon_max});
-      way["natural"="water"]({lat_min},{lon_min},{lat_max},{lon_max});
-      way["landuse"="grass"]({lat_min},{lon_min},{lat_max},{lon_max});
-      relation["building"]({lat_min},{lon_min},{lat_max},{lon_max});
-      relation["natural"="water"]({lat_min},{lon_min},{lat_max},{lon_max});
+      way["building"];
+      way["highway"];
+      way["railway"];
+      way["waterway"];
+      way["natural"="water"];
+      way["landuse"="grass"];
+      relation["building"];
+      relation["natural"="water"];
     );
-    out body;
+    out meta;
     >;
-    out skel qt;
+    out meta qt;
     """
 
     last_error = None
@@ -59,10 +60,17 @@ def fetch_osm_data(bbox: tuple, timeout: int = 180) -> str:
 
             if response.status_code == 200:
                 osm_data = response.text
-                # Add bounds element if not present (needed by OSM2World)
+                # Add bounds element right after <osm> tag (OSM2World requires it before entities)
                 if "<bounds" not in osm_data:
                     bounds = f'  <bounds minlat="{lat_min}" minlon="{lon_min}" maxlat="{lat_max}" maxlon="{lon_max}"/>\n'
-                    osm_data = osm_data.replace("</osm>", bounds + "</osm>")
+                    # Insert bounds after the opening <osm ...> tag
+                    import re
+                    osm_data = re.sub(
+                        r'(<osm[^>]*>)\s*',
+                        r'\1\n' + bounds,
+                        osm_data,
+                        count=1
+                    )
                 return osm_data
             elif response.status_code == 429:
                 print(f"Rate limited by {endpoint}, trying next...")

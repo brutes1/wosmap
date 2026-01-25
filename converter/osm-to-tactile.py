@@ -37,19 +37,42 @@ def run_osm2world(input_path, output_path, scale, exclude_buildings):
     osm2world_path = os.environ.get('OSM2WORLD_JAR', '/app/OSM2World.jar')
     if not os.path.exists(osm2world_path):
         osm2world_path = os.path.join(script_dir, '..', 'OSM2World', 'build', 'OSM2World.jar')
-    #print(osm2world_path + " " + input_path + " " + output_path)
+
+    # OSM2World needs to run from the directory containing lib/ and resources/
+    osm2world_dir = os.path.dirname(osm2world_path)
+
+    # Convert to absolute paths since we're changing working directory
+    input_path = os.path.abspath(input_path)
+    output_path = os.path.abspath(output_path)
+
     cmd = [
         'java', '-Xmx1G',
         '-jar', osm2world_path,
         '-i', input_path,
         '-o', output_path]
-    output = subprocess_output(cmd, { 'TOUCH_MAPPER_SCALE': str(scale), 'TOUCH_MAPPER_EXTRUDER_WIDTH': '0.5', 'TOUCH_MAPPER_EXCLUDE_BUILDINGS': ('true' if exclude_buildings else 'false') })
+
+    print("Running OSM2World from directory:", osm2world_dir)
+    en = os.environ.copy()
+    en.update({
+        'TOUCH_MAPPER_SCALE': str(scale),
+        'TOUCH_MAPPER_EXTRUDER_WIDTH': '0.5',
+        'TOUCH_MAPPER_EXCLUDE_BUILDINGS': ('true' if exclude_buildings else 'false')
+    })
+
+    try:
+        output = subprocess.check_output(cmd, stderr=subprocess.STDOUT, env=en, cwd=osm2world_dir).decode("utf-8")
+    except subprocess.CalledProcessError as e:
+        print("OSM2World failed with error:")
+        print(e.output.decode("utf-8"))
+        raise e
     print(output)
 
     # Find bounds from output
     m = re.compile('.*Map-boundary:\[ minX=([0-9.-]+) minZ=([0-9.-]+) maxX=([0-9.-]+) maxZ=([0-9.-]+) \]', re.DOTALL).match(output)
     if not m:
-        raise Exception("Couldn't find map bounds from OSM2World output")
+        print("OSM2World output was:")
+        print(output[:2000] if len(output) > 2000 else output)
+        raise Exception("Couldn't find map bounds from OSM2World output. See output above.")
     bounds = {
         'minX': float(m.group(1)),
         'minY': float(m.group(2)), # change from Z to Y
