@@ -2,7 +2,7 @@
   <div class="container">
     <header>
       <h1>WOSMap</h1>
-      <p class="subtitle">Create 3D-printable tactile maps for the visually impaired</p>
+      <p class="subtitle">Capture the world exactly as it was the moment your story changed</p>
     </header>
 
     <main>
