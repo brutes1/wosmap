@@ -32,11 +32,18 @@ def signal_handler(signum, frame):
 
 
 def update_job_status(r: redis.Redis, job_id: str, status: str, data: dict = None):
-    """Update job status in Redis."""
-    result = {
-        "status": status,
-        "updated_at": datetime.utcnow().isoformat(),
-    }
+    """Update job status in Redis, preserving existing fields like location_name."""
+    # Get existing job data to preserve fields like location_name
+    existing = r.get(f"result:{job_id}")
+    if existing:
+        result = json.loads(existing)
+    else:
+        result = {}
+
+    # Update with new status
+    result["status"] = status
+    result["updated_at"] = datetime.utcnow().isoformat()
+
     if data:
         result.update(data)
     r.set(f"result:{job_id}", json.dumps(result))
