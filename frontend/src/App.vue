@@ -1,7 +1,7 @@
 <template>
   <div class="container">
     <header>
-      <h1>Tactile Map Generator</h1>
+      <h1>WOSMap</h1>
       <p class="subtitle">Create 3D-printable tactile maps for the visually impaired</p>
     </header>
 

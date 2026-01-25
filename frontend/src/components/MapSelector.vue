@@ -89,7 +89,7 @@ export default {
     return {
       map: null,
       marker: null,
-      circle: null,
+      rectangle: null,  // Coverage area overlay (square)
       searchQuery: '',
       isSearching: false,
     }
@@ -100,18 +100,19 @@ export default {
       return this.latitude !== null && this.longitude !== null
     },
 
-    // Coverage radius in meters
-    coverageRadius() {
-      // diameter = sizeCm * scale / 100 (converts cm at scale to meters)
-      const diameterMeters = (this.sizeCm * this.scale) / 100
-      return diameterMeters / 2
+    // Coverage half-side in meters (the map is square)
+    coverageHalfSide() {
+      // sizeCm * scale / 100 converts cm at scale to meters
+      // This gives the full side length, divide by 2 for half
+      const sideMeters = (this.sizeCm * this.scale) / 100
+      return sideMeters / 2
     },
   },
 
   watch: {
-    // Update circle when scale or size changes
-    coverageRadius() {
-      this.updateCircle()
+    // Update rectangle when scale or size changes
+    coverageHalfSide() {
+      this.updateRectangle()
     },
 
     // Update marker when coords change externally
@@ -212,24 +213,43 @@ export default {
         const pos = e.target.getLatLng()
         this.$emit('update:latitude', pos.lat)
         this.$emit('update:longitude', pos.lng)
-        this.updateCircle()
+        this.updateRectangle()
       })
 
-      // Update circle
-      this.updateCircle()
+      // Update rectangle
+      this.updateRectangle()
     },
 
-    updateCircle() {
+    // Convert meters to latitude degrees (constant everywhere on Earth)
+    metersToLatDegrees(meters) {
+      return meters / 111320  // 1 degree lat ≈ 111.32 km
+    },
+
+    // Convert meters to longitude degrees (varies by latitude)
+    metersToLngDegrees(meters, lat) {
+      return meters / (111320 * Math.cos(lat * Math.PI / 180))
+    },
+
+    updateRectangle() {
       if (!this.hasMarker || !this.map) return
 
-      // Remove existing circle
-      if (this.circle) {
-        this.map.removeLayer(this.circle)
+      // Remove existing rectangle
+      if (this.rectangle) {
+        this.map.removeLayer(this.rectangle)
       }
 
-      // Create new circle showing coverage area
-      this.circle = L.circle([this.latitude, this.longitude], {
-        radius: this.coverageRadius,
+      // Calculate bounds for a square centered on the marker
+      const halfSide = this.coverageHalfSide
+      const latOffset = this.metersToLatDegrees(halfSide)
+      const lngOffset = this.metersToLngDegrees(halfSide, this.latitude)
+
+      const bounds = [
+        [this.latitude - latOffset, this.longitude - lngOffset],  // SW corner
+        [this.latitude + latOffset, this.longitude + lngOffset]   // NE corner
+      ]
+
+      // Create new rectangle showing coverage area (matches printed map shape)
+      this.rectangle = L.rectangle(bounds, {
         color: '#4a90d9',
         fillColor: '#4a90d9',
         fillOpacity: 0.15,
@@ -246,13 +266,13 @@ export default {
         } else {
           this.setMarker(this.latitude, this.longitude)
         }
-        this.updateCircle()
+        this.updateRectangle()
       } else if (this.marker) {
         this.map.removeLayer(this.marker)
         this.marker = null
-        if (this.circle) {
-          this.map.removeLayer(this.circle)
-          this.circle = null
+        if (this.rectangle) {
+          this.map.removeLayer(this.rectangle)
+          this.rectangle = null
         }
       }
     },
@@ -262,9 +282,9 @@ export default {
         this.map.removeLayer(this.marker)
         this.marker = null
       }
-      if (this.circle) {
-        this.map.removeLayer(this.circle)
-        this.circle = null
+      if (this.rectangle) {
+        this.map.removeLayer(this.rectangle)
+        this.rectangle = null
       }
       this.$emit('update:latitude', null)
       this.$emit('update:longitude', null)

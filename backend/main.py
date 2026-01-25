@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 import redis
 
-from geocoding import geocode_address
+from geocoding import geocode_address, reverse_geocode
 
 
 # Configuration
@@ -27,7 +27,7 @@ MAPS_DIR = Path(os.environ.get("MAPS_DIR", "/data/maps"))
 
 # Initialize FastAPI
 app = FastAPI(
-    title="Tactile Map Generator API",
+    title="WOSMap API",
     description="Generate 3D-printable tactile maps from geographic data",
     version="1.0.0",
 )
@@ -104,7 +104,7 @@ class PrinterConfig(BaseModel):
 @app.get("/")
 async def root():
     """Health check endpoint."""
-    return {"status": "ok", "service": "tactile-map-generator"}
+    return {"status": "ok", "service": "wosmap"}
 
 
 @app.get("/api/health")
@@ -156,6 +156,12 @@ async def create_map(request: MapRequest):
     # Generate job ID
     job_id = str(uuid.uuid4())
 
+    # Get location name for file naming
+    location_name = await reverse_geocode(lat, lon)
+    if location_name is None:
+        # Fallback to coordinates
+        location_name = f"{lat:.3f}_{lon:.3f}"
+
     # Create job payload
     job = {
         "id": job_id,
@@ -165,6 +171,7 @@ async def create_map(request: MapRequest):
         "size_cm": request.size_cm,
         "include_buildings": request.include_buildings,
         "data_source": request.data_source,
+        "location_name": location_name,
         "created_at": datetime.utcnow().isoformat(),
     }
 
@@ -176,6 +183,7 @@ async def create_map(request: MapRequest):
     r.set(f"result:{job_id}", json.dumps({
         "status": "queued",
         "job_id": job_id,
+        "location_name": location_name,
         "created_at": job["created_at"],
     }))
 
@@ -251,9 +259,20 @@ async def download_map(job_id: str, file_type: str = "stl"):
         "pdf": "application/pdf",
     }
 
+    # Generate user-friendly filename: wosmap_[location]_[date].stl
+    location_name = data.get("location_name", "map")
+    created_at = data.get("created_at", "")
+    if created_at:
+        # Extract date from ISO timestamp
+        date_str = created_at.split("T")[0]
+    else:
+        date_str = datetime.utcnow().strftime("%Y-%m-%d")
+
+    filename = f"wosmap_{location_name}_{date_str}.{file_type}"
+
     return FileResponse(
         path=file_path,
-        filename=f"tactile_map_{job_id}.{file_type}",
+        filename=filename,
         media_type=content_types.get(file_type, "application/octet-stream")
     )
 
