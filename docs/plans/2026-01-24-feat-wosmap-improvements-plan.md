@@ -96,7 +96,7 @@ Store location name in job metadata and use for filename.
 - [x] Package.json name updated to "wosmap"
 - [x] Downloaded files use format: `wosmap_[city]_[date].stl`
 - [x] Fallback filename works when reverse geocoding fails
-- [ ] All tests pass
+- [x] All tests pass
 
 ## Implementation Phases
 
