@@ -216,9 +216,11 @@ async def get_map_status(job_id: str):
     return JobStatus(
         job_id=job_id,
         status=data.get("status", "unknown"),
+        stage_message=data.get("stage_message"),
         created_at=data.get("created_at"),
         updated_at=data.get("updated_at"),
         files=data.get("files"),
+        file_info=data.get("file_info"),
         error=data.get("error"),
         metadata=data.get("metadata"),
     )
