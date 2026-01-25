@@ -6,52 +6,16 @@
     </header>
 
     <main>
-      <!-- Location Input -->
+      <!-- Location Selection -->
       <section class="card">
         <h2>Location</h2>
-
-        <div class="form-group">
-          <label>
-            <input type="checkbox" v-model="useCoordinates" />
-            Use GPS coordinates instead of address
-          </label>
-        </div>
-
-        <div v-if="!useCoordinates" class="form-group">
-          <label for="address">Address</label>
-          <input
-            id="address"
-            type="text"
-            v-model="address"
-            placeholder="123 Main St, City, State"
-            :disabled="isProcessing"
-          />
-        </div>
-
-        <div v-else class="form-row">
-          <div class="form-group">
-            <label for="latitude">Latitude</label>
-            <input
-              id="latitude"
-              type="number"
-              step="0.0001"
-              v-model.number="latitude"
-              placeholder="37.7749"
-              :disabled="isProcessing"
-            />
-          </div>
-          <div class="form-group">
-            <label for="longitude">Longitude</label>
-            <input
-              id="longitude"
-              type="number"
-              step="0.0001"
-              v-model.number="longitude"
-              placeholder="-122.4194"
-              :disabled="isProcessing"
-            />
-          </div>
-        </div>
+        <MapSelector
+          v-model:latitude="latitude"
+          v-model:longitude="longitude"
+          :scale="scale"
+          :size-cm="sizeCm"
+          :disabled="isProcessing"
+        />
       </section>
 
       <!-- Print Settings -->
@@ -205,14 +169,18 @@
 
 <script>
 import { createMap, getMapStatus, getDownloadUrl, configurePrinter, sendToPrinter, pollUntilComplete } from './api.js'
+import MapSelector from './components/MapSelector.vue'
 
 export default {
   name: 'App',
+
+  components: {
+    MapSelector,
+  },
+
   data() {
     return {
-      // Location
-      useCoordinates: false,
-      address: '',
+      // Location (set by MapSelector)
       latitude: null,
       longitude: null,
 
@@ -239,10 +207,8 @@ export default {
 
   computed: {
     isValid() {
-      if (this.useCoordinates) {
-        return this.latitude !== null && this.longitude !== null
-      }
-      return this.address.trim().length > 0
+      // Valid when we have coordinates from the map
+      return this.latitude !== null && this.longitude !== null
     },
 
     statusMessage() {
@@ -279,17 +245,12 @@ export default {
 
       try {
         const params = {
+          latitude: this.latitude,
+          longitude: this.longitude,
           scale: this.scale,
           size_cm: this.sizeCm,
           include_buildings: this.includeBuildings,
           data_source: this.dataSource,
-        }
-
-        if (this.useCoordinates) {
-          params.latitude = this.latitude
-          params.longitude = this.longitude
-        } else {
-          params.address = this.address
         }
 
         // Submit job
