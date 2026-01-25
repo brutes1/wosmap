@@ -1,11 +1,16 @@
 """
 Map data sources for tactile map generation.
-Fetches geographic data from OpenStreetMap and optionally Microsoft Building Footprints.
+Fetches geographic data from OpenStreetMap and optionally Overture Maps.
 """
 
+import json
+import os
+import re
+import subprocess
 import requests
 import time
 from typing import Optional
+from xml.etree import ElementTree as ET
 
 
 OVERPASS_ENDPOINTS = [
@@ -151,11 +156,112 @@ def calculate_bbox(lat: float, lon: float, diameter_meters: int) -> tuple:
     )
 
 
+def fetch_overture_buildings(bbox: tuple, output_dir: str) -> str:
+    """
+    Fetch building footprints from Overture Maps.
+
+    Args:
+        bbox: (lat_min, lon_min, lat_max, lon_max)
+        output_dir: Directory to save GeoJSON
+
+    Returns:
+        Path to buildings GeoJSON file
+    """
+    lat_min, lon_min, lat_max, lon_max = bbox
+    output_path = os.path.join(output_dir, "overture_buildings.geojson")
+
+    # Overture bbox format: west,south,east,north (lon_min,lat_min,lon_max,lat_max)
+    cmd = [
+        "overturemaps", "download",
+        f"--bbox={lon_min},{lat_min},{lon_max},{lat_max}",
+        "-f", "geojson",
+        "--type=building",
+        "-o", output_path
+    ]
+
+    print(f"Fetching Overture buildings: {' '.join(cmd)}")
+    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+
+    if result.returncode != 0:
+        raise Exception(f"Overture download failed: {result.stderr}")
+
+    if not os.path.exists(output_path):
+        raise Exception("Overture download produced no output file")
+
+    return output_path
+
+
+def merge_overture_with_osm(osm_xml: str, overture_geojson_path: str) -> str:
+    """
+    Merge Overture building footprints into OSM XML data.
+
+    Overture buildings supplement OSM data - we add Overture buildings
+    that provide additional coverage beyond what OSM has.
+    """
+    # Parse OSM XML
+    root = ET.fromstring(osm_xml)
+
+    # Load Overture GeoJSON
+    with open(overture_geojson_path) as f:
+        overture = json.load(f)
+
+    # Generate synthetic OSM IDs (negative to avoid conflicts with real OSM IDs)
+    way_id = -1000000
+    node_id = -1000000
+
+    buildings_added = 0
+    for feature in overture.get("features", []):
+        geom_type = feature.get("geometry", {}).get("type")
+
+        if geom_type == "Polygon":
+            coords = feature["geometry"]["coordinates"][0]
+        elif geom_type == "MultiPolygon":
+            # Take the first polygon from multipolygon
+            coords = feature["geometry"]["coordinates"][0][0]
+        else:
+            continue
+
+        # Create nodes for the building polygon
+        node_refs = []
+        for lon, lat in coords:
+            node = ET.SubElement(root, "node", {
+                "id": str(node_id),
+                "lat": str(lat),
+                "lon": str(lon),
+                "version": "1"
+            })
+            node_refs.append(str(node_id))
+            node_id -= 1
+
+        # Create way for the building
+        way = ET.SubElement(root, "way", {
+            "id": str(way_id),
+            "version": "1"
+        })
+        for ref in node_refs:
+            ET.SubElement(way, "nd", {"ref": ref})
+        ET.SubElement(way, "tag", {"k": "building", "v": "yes"})
+        ET.SubElement(way, "tag", {"k": "source", "v": "Overture Maps"})
+
+        # Add height if available
+        props = feature.get("properties", {})
+        height = props.get("height")
+        if height:
+            ET.SubElement(way, "tag", {"k": "height", "v": str(height)})
+
+        way_id -= 1
+        buildings_added += 1
+
+    print(f"Added {buildings_added} buildings from Overture Maps")
+    return ET.tostring(root, encoding="unicode")
+
+
 def get_map_data(
     lat: float,
     lon: float,
     diameter_meters: int,
     data_source: str = "osm",
+    work_dir: str = "/tmp",
     timeout: int = 180
 ) -> str:
     """
@@ -165,7 +271,8 @@ def get_map_data(
         lat: Center latitude
         lon: Center longitude
         diameter_meters: Diameter of area in meters
-        data_source: "osm" or "osm_ms" (with Microsoft buildings)
+        data_source: "osm" or "overture" (with Overture Maps buildings)
+        work_dir: Working directory for temporary files
         timeout: Request timeout
 
     Returns:
@@ -179,7 +286,16 @@ def get_map_data(
         print(f"Overpass API failed: {e}, trying XAPI...")
         osm_data = fetch_osm_xapi(bbox, timeout)
 
-    # TODO: If data_source == "osm_ms", merge Microsoft building footprints
-    # This would require downloading quadkey-indexed files from Microsoft's dataset
+    # If Overture source requested, merge additional buildings
+    # Accept both "overture" and legacy "osm_ms" for backwards compatibility
+    if data_source in ("overture", "osm_ms"):
+        try:
+            overture_path = fetch_overture_buildings(bbox, work_dir)
+            osm_data = merge_overture_with_osm(osm_data, overture_path)
+            # Clean up temp file
+            if os.path.exists(overture_path):
+                os.remove(overture_path)
+        except Exception as e:
+            print(f"Overture fetch failed, using OSM only: {e}")
 
     return osm_data

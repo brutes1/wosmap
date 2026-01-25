@@ -63,11 +63,11 @@
         <div class="radio-group">
           <label>
             <input type="radio" v-model="dataSource" value="osm" :disabled="isProcessing" />
-            OpenStreetMap (default)
+            OpenStreetMap (community-sourced)
           </label>
           <label>
-            <input type="radio" v-model="dataSource" value="osm_ms" :disabled="isProcessing" />
-            OSM + Microsoft Buildings (better coverage)
+            <input type="radio" v-model="dataSource" value="overture" :disabled="isProcessing" />
+            Overture Maps (OSM + Microsoft + Google + Esri)
           </label>
         </div>
       </section>

@@ -72,15 +72,15 @@ def process_map_request(job: dict, work_dir: str = "/data/maps") -> dict:
     print(f"  Scale: 1:{scale}, Size: {size_cm}cm, Diameter: {diameter}m")
     print(f"  Bounding box: {bbox}")
 
-    # Step 1: Fetch OSM data
-    print("Step 1: Fetching OSM data...")
+    # Step 1: Fetch OSM data (and optionally Overture buildings)
+    print("Step 1: Fetching map data...")
     osm_path = job_dir / "map.osm"
     try:
-        osm_data = get_map_data(lat, lon, diameter, data_source)
+        osm_data = get_map_data(lat, lon, diameter, data_source, work_dir=str(job_dir))
         osm_path.write_text(osm_data)
         print(f"  Saved OSM data to {osm_path} ({len(osm_data)} bytes)")
     except Exception as e:
-        raise Exception(f"Failed to fetch OSM data: {e}")
+        raise Exception(f"Failed to fetch map data: {e}")
 
     # Step 2: Run osm-to-tactile.py (which calls OSM2World + Blender)
     print("Step 2: Converting OSM to STL...")
