@@ -5,10 +5,11 @@ Handles job submission, status checking, and file downloads.
 
 import os
 import json
+import shutil
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
@@ -201,6 +202,55 @@ async def create_map(request: MapRequest):
         status="queued",
         message="Map generation job submitted successfully"
     )
+
+
+@app.get("/api/maps")
+async def list_maps():
+    """List all map generation jobs."""
+    r = get_redis()
+    jobs = []
+
+    # Get all result keys
+    for key in r.scan_iter("result:*"):
+        data = json.loads(r.get(key))
+        job_id = key.replace("result:", "")
+        jobs.append({
+            "job_id": job_id,
+            "status": data.get("status"),
+            "location_name": data.get("location_name"),
+            "created_at": data.get("created_at"),
+            "file_info": data.get("file_info"),
+        })
+
+    # Sort by created_at descending
+    jobs.sort(key=lambda x: x.get("created_at") or "", reverse=True)
+    return {"jobs": jobs}
+
+
+@app.delete("/api/maps")
+async def clear_history():
+    """Delete all completed map jobs and their files."""
+    r = get_redis()
+    deleted_count = 0
+
+    for key in r.scan_iter("result:*"):
+        data = json.loads(r.get(key))
+
+        # Delete files if they exist
+        files = data.get("files", {})
+        for file_type, file_path in files.items():
+            path = Path(file_path)
+            if path.exists():
+                # Delete the job directory (all files in same dir)
+                if path.parent.exists():
+                    shutil.rmtree(path.parent)
+                    break
+
+        # Delete Redis key
+        r.delete(key)
+        deleted_count += 1
+
+    return {"deleted": deleted_count, "message": f"Deleted {deleted_count} jobs"}
 
 
 @app.get("/api/maps/{job_id}", response_model=JobStatus)

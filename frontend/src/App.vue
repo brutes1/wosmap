@@ -121,6 +121,38 @@
           </button>
         </div>
       </section>
+
+      <!-- History -->
+      <section class="card history-card">
+        <div class="history-header" @click="showHistory = !showHistory">
+          <h2>History ({{ history.length }})</h2>
+          <span class="toggle-icon">{{ showHistory ? '▼' : '►' }}</span>
+        </div>
+
+        <div v-if="showHistory" class="history-content">
+          <div v-if="history.length === 0" class="empty-history">
+            No maps generated yet
+          </div>
+
+          <div v-for="job in history" :key="job.job_id" class="history-item">
+            <div class="history-info">
+              <span class="history-location">{{ job.location_name }}</span>
+              <span class="history-date">{{ formatDate(job.created_at) }}</span>
+            </div>
+            <div class="history-stats">
+              <span>{{ job.file_info?.size_human }}</span>
+              <span>{{ formatNumber(job.file_info?.triangles) }} triangles</span>
+            </div>
+            <a :href="getJobDownloadUrl(job.job_id)" class="btn-small" download>
+              Download
+            </a>
+          </div>
+
+          <button v-if="history.length > 0" class="btn-danger" @click="clearAllHistory">
+            Clear All History
+          </button>
+        </div>
+      </section>
     </main>
 
     <!-- Printer Configuration Modal -->
@@ -186,7 +218,7 @@
 </template>
 
 <script>
-import { createMap, getMapStatus, getDownloadUrl, configurePrinter, sendToPrinter, pollUntilComplete } from './api.js'
+import { createMap, getMapStatus, getDownloadUrl, configurePrinter, sendToPrinter, pollUntilComplete, getHistory, clearHistory } from './api.js'
 import MapSelector from './components/MapSelector.vue'
 
 export default {
@@ -206,7 +238,7 @@ export default {
       scale: 3463,
       sizeCm: 23,
       includeBuildings: true,
-      dataSource: 'osm',
+      dataSource: 'overture',
 
       // Status
       status: null,
@@ -232,7 +264,15 @@ export default {
       printerIp: '',
       printerAccessCode: '',
       printerSerial: '',
+
+      // History
+      history: [],
+      showHistory: false,
     }
+  },
+
+  async mounted() {
+    await this.loadHistory()
   },
 
   computed: {
@@ -305,6 +345,9 @@ export default {
         this.completed = true
         this.fileInfo = result.file_info
 
+        // Refresh history to include new job
+        await this.loadHistory()
+
       } catch (err) {
         this.status = 'failed'
         this.error = err.message
@@ -340,6 +383,35 @@ export default {
       } catch (err) {
         alert('Failed to send to printer: ' + err.message)
       }
+    },
+
+    async loadHistory() {
+      try {
+        const result = await getHistory()
+        this.history = result.jobs.filter(j => j.status === 'completed')
+      } catch (err) {
+        console.error('Failed to load history:', err)
+      }
+    },
+
+    async clearAllHistory() {
+      if (!confirm('Delete all generated maps? This cannot be undone.')) return
+      try {
+        await clearHistory()
+        this.history = []
+      } catch (err) {
+        alert('Failed to clear history: ' + err.message)
+      }
+    },
+
+    formatDate(isoString) {
+      if (!isoString) return ''
+      const date = new Date(isoString)
+      return date.toLocaleDateString()
+    },
+
+    getJobDownloadUrl(jobId) {
+      return getDownloadUrl(jobId, 'stl')
     },
   },
 }
@@ -637,5 +709,115 @@ footer {
 
 footer a {
   color: #666;
+}
+
+/* History */
+.history-card {
+  margin-top: 20px;
+}
+
+.history-card h2 {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-icon {
+  color: #666;
+  font-size: 12px;
+}
+
+.history-content {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+
+.empty-history {
+  color: #999;
+  font-size: 14px;
+  text-align: center;
+  padding: 20px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.history-info {
+  flex: 1;
+}
+
+.history-location {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+}
+
+.history-date {
+  display: block;
+  font-size: 12px;
+  color: #999;
+}
+
+.history-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 12px;
+  color: #666;
+  gap: 2px;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  background: #4a90d9;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn-small:hover {
+  background: #3a7bc8;
+}
+
+.btn-danger {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-top: 12px;
+  background: white;
+  color: #dc3545;
+  border: 2px solid #dc3545;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background: #dc3545;
+  color: white;
 }
 </style>

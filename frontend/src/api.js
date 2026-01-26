@@ -46,6 +46,30 @@ export function getDownloadUrl(jobId, fileType = 'stl') {
 }
 
 /**
+ * Get history of all map generation jobs.
+ */
+export async function getHistory() {
+  const response = await fetch(`${API_BASE}/maps`)
+  if (!response.ok) {
+    throw new Error('Failed to get history')
+  }
+  return response.json()
+}
+
+/**
+ * Clear all map generation history and delete files.
+ */
+export async function clearHistory() {
+  const response = await fetch(`${API_BASE}/maps`, {
+    method: 'DELETE',
+  })
+  if (!response.ok) {
+    throw new Error('Failed to clear history')
+  }
+  return response.json()
+}
+
+/**
  * Configure the Bambu X1C printer.
  */
 export async function configurePrinter(config) {

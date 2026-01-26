@@ -197,6 +197,10 @@ def merge_overture_with_osm(osm_xml: str, overture_geojson_path: str) -> str:
 
     Overture buildings supplement OSM data - we add Overture buildings
     that provide additional coverage beyond what OSM has.
+
+    OSM XML format requires: bounds, then nodes, then ways, then relations.
+    We insert Overture nodes among existing nodes, and Overture ways among existing ways.
+    We also expand the bounds element to include all Overture buildings.
     """
     # Parse OSM XML
     root = ET.fromstring(osm_xml)
@@ -205,9 +209,34 @@ def merge_overture_with_osm(osm_xml: str, overture_geojson_path: str) -> str:
     with open(overture_geojson_path) as f:
         overture = json.load(f)
 
+    # Find insertion points: after last node, after last way
+    # OSM format: bounds -> nodes -> ways -> relations
+    last_node_idx = 0
+    last_way_idx = 0
+    bounds_elem = None
+    for i, child in enumerate(root):
+        if child.tag == "bounds":
+            bounds_elem = child
+        elif child.tag == "node":
+            last_node_idx = i + 1
+        elif child.tag == "way":
+            last_way_idx = i + 1
+
+    # If no ways found, insert ways after nodes
+    if last_way_idx == 0:
+        last_way_idx = last_node_idx
+
     # Generate synthetic OSM IDs (negative to avoid conflicts with real OSM IDs)
     way_id = -1000000
     node_id = -1000000
+
+    # Track min/max coordinates for bounds update
+    all_lats = []
+    all_lons = []
+
+    # Collect all new nodes and ways first
+    new_nodes = []
+    new_ways = []
 
     buildings_added = 0
     for feature in overture.get("features", []):
@@ -224,17 +253,20 @@ def merge_overture_with_osm(osm_xml: str, overture_geojson_path: str) -> str:
         # Create nodes for the building polygon
         node_refs = []
         for lon, lat in coords:
-            node = ET.SubElement(root, "node", {
+            node = ET.Element("node", {
                 "id": str(node_id),
                 "lat": str(lat),
                 "lon": str(lon),
                 "version": "1"
             })
+            new_nodes.append(node)
             node_refs.append(str(node_id))
             node_id -= 1
+            all_lats.append(lat)
+            all_lons.append(lon)
 
         # Create way for the building
-        way = ET.SubElement(root, "way", {
+        way = ET.Element("way", {
             "id": str(way_id),
             "version": "1"
         })
@@ -249,8 +281,35 @@ def merge_overture_with_osm(osm_xml: str, overture_geojson_path: str) -> str:
         if height:
             ET.SubElement(way, "tag", {"k": "height", "v": str(height)})
 
+        new_ways.append(way)
         way_id -= 1
         buildings_added += 1
+
+    # Update bounds to include Overture buildings
+    if bounds_elem is not None and all_lats:
+        cur_minlat = float(bounds_elem.get("minlat", 90))
+        cur_maxlat = float(bounds_elem.get("maxlat", -90))
+        cur_minlon = float(bounds_elem.get("minlon", 180))
+        cur_maxlon = float(bounds_elem.get("maxlon", -180))
+
+        new_minlat = min(cur_minlat, min(all_lats))
+        new_maxlat = max(cur_maxlat, max(all_lats))
+        new_minlon = min(cur_minlon, min(all_lons))
+        new_maxlon = max(cur_maxlon, max(all_lons))
+
+        bounds_elem.set("minlat", str(new_minlat))
+        bounds_elem.set("maxlat", str(new_maxlat))
+        bounds_elem.set("minlon", str(new_minlon))
+        bounds_elem.set("maxlon", str(new_maxlon))
+
+    # Insert new nodes after existing nodes (before ways)
+    for i, node in enumerate(new_nodes):
+        root.insert(last_node_idx + i, node)
+
+    # Insert new ways after existing ways (accounting for the nodes we just added)
+    way_insert_idx = last_way_idx + len(new_nodes)
+    for i, way in enumerate(new_ways):
+        root.insert(way_insert_idx + i, way)
 
     print(f"Added {buildings_added} buildings from Overture Maps")
     return ET.tostring(root, encoding="unicode")
