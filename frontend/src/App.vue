@@ -116,10 +116,14 @@
           <a :href="downloadUrl" class="btn-secondary" download>
             Download STL
           </a>
+          <a :href="download3mfUrl" class="btn-secondary" download>
+            Download 3MF
+          </a>
           <button class="btn-secondary" @click="showPrinterModal = true">
             Send to Printer
           </button>
         </div>
+        <p class="download-note">3MF is pre-sliced with ironing for smooth tactile surfaces (0.3mm layers, 20% ironing)</p>
       </section>
 
       <!-- History -->
@@ -143,9 +147,10 @@
               <span>{{ job.file_info?.size_human }}</span>
               <span>{{ formatNumber(job.file_info?.triangles) }} triangles</span>
             </div>
-            <a :href="getJobDownloadUrl(job.job_id)" class="btn-small" download>
-              Download
-            </a>
+            <div class="history-buttons">
+              <a :href="getJobDownloadUrl(job.job_id)" class="btn-small" download>STL</a>
+              <a :href="getJob3mfUrl(job.job_id)" class="btn-small btn-small-alt" download>3MF</a>
+            </div>
           </div>
 
           <button v-if="history.length > 0" class="btn-danger" @click="clearAllHistory">
@@ -308,6 +313,11 @@ export default {
       if (!this.jobId) return '#'
       return getDownloadUrl(this.jobId, 'stl')
     },
+
+    download3mfUrl() {
+      if (!this.jobId) return '#'
+      return getDownloadUrl(this.jobId, '3mf')
+    },
   },
 
   methods: {
@@ -412,6 +422,10 @@ export default {
 
     getJobDownloadUrl(jobId) {
       return getDownloadUrl(jobId, 'stl')
+    },
+
+    getJob3mfUrl(jobId) {
+      return getDownloadUrl(jobId, '3mf')
     },
   },
 }
@@ -632,6 +646,12 @@ header h1 {
   margin-bottom: 16px;
 }
 
+.download-note {
+  font-size: 11px;
+  color: #666;
+  margin-top: 12px;
+}
+
 .file-details {
   margin-bottom: 16px;
   text-align: left;
@@ -784,6 +804,11 @@ footer a {
   gap: 2px;
 }
 
+.history-buttons {
+  display: flex;
+  gap: 6px;
+}
+
 .btn-small {
   padding: 6px 12px;
   background: #4a90d9;
@@ -799,6 +824,14 @@ footer a {
 
 .btn-small:hover {
   background: #3a7bc8;
+}
+
+.btn-small-alt {
+  background: #28a745;
+}
+
+.btn-small-alt:hover {
+  background: #1e7e34;
 }
 
 .btn-danger {

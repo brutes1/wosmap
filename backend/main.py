@@ -283,7 +283,7 @@ async def download_map(job_id: str, file_type: str = "stl"):
 
     Args:
         job_id: The job ID
-        file_type: Type of file to download (stl, svg, blend)
+        file_type: Type of file to download (stl, svg, blend, 3mf)
     """
     r = get_redis()
     result = r.get(f"result:{job_id}")
@@ -300,15 +300,41 @@ async def download_map(job_id: str, file_type: str = "stl"):
         )
 
     files = data.get("files", {})
-    file_path = files.get(file_type)
 
-    if file_path is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"File type '{file_type}' not available. Available: {list(files.keys())}"
-        )
+    # Handle 3MF: slice on-demand if not already cached
+    if file_type == "3mf":
+        stl_path = files.get("stl")
+        if stl_path is None:
+            raise HTTPException(status_code=404, detail="STL file not found for slicing")
 
-    file_path = Path(file_path)
+        stl_path = Path(stl_path)
+        threemf_path = stl_path.with_suffix(".3mf")
+
+        # Check if 3MF already exists (cached)
+        if not threemf_path.exists():
+            from printer import slice_to_3mf, PrinterError, PROFILES_DIR
+
+            profile_path = PROFILES_DIR / "tactile_map_ironing.json"
+
+            try:
+                slice_to_3mf(str(stl_path), str(threemf_path), str(profile_path))
+            except PrinterError as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Slicing failed: {e}. Make sure OrcaSlicer is installed."
+                )
+
+        file_path = threemf_path
+    else:
+        file_path = files.get(file_type)
+
+        if file_path is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"File type '{file_type}' not available. Available: {list(files.keys())}"
+            )
+
+        file_path = Path(file_path)
 
     # Security: Validate file is within MAPS_DIR to prevent path traversal
     try:
@@ -326,6 +352,7 @@ async def download_map(job_id: str, file_type: str = "stl"):
         "svg": "image/svg+xml",
         "blend": "application/octet-stream",
         "pdf": "application/pdf",
+        "3mf": "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
     }
 
     # Generate user-friendly filename: wosmap_[location]_[date].stl

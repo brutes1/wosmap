@@ -36,6 +36,90 @@ class PrinterError(Exception):
 
 # Security: Define allowed directories for file operations
 MAPS_DIR = Path(os.environ.get("MAPS_DIR", "/data/maps"))
+PROFILES_DIR = Path(__file__).parent / "profiles"
+
+
+def find_orcaslicer() -> Optional[str]:
+    """Find OrcaSlicer executable."""
+    # Check environment variable first
+    orca_path = os.environ.get("ORCASLICER_PATH")
+    if orca_path and os.path.exists(orca_path):
+        return orca_path
+
+    # Common installation locations
+    locations = [
+        "/usr/local/bin/orca-slicer",
+        "/opt/OrcaSlicer/orca-slicer",
+        "/Applications/OrcaSlicer.app/Contents/MacOS/OrcaSlicer",
+        os.path.expanduser("~/.local/bin/orca-slicer"),
+    ]
+
+    for loc in locations:
+        if os.path.exists(loc):
+            return loc
+
+    # Try PATH
+    try:
+        result = subprocess.run(
+            ["which", "orca-slicer"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except:
+        pass
+
+    return None
+
+
+def slice_to_3mf(stl_path: str, output_path: str, profile_path: Optional[str] = None) -> str:
+    """
+    Slice an STL file to 3MF using OrcaSlicer CLI.
+
+    This standalone function doesn't require printer configuration.
+
+    Args:
+        stl_path: Path to input STL file
+        output_path: Path for output 3MF file
+        profile_path: Optional path to slicing profile JSON
+
+    Returns:
+        Path to the sliced 3MF file
+
+    Raises:
+        PrinterError: If slicing fails or OrcaSlicer not found
+    """
+    orca_path = find_orcaslicer()
+    if orca_path is None:
+        raise PrinterError(
+            "OrcaSlicer not found. Install from https://github.com/SoftFever/OrcaSlicer"
+        )
+
+    cmd = [orca_path, "--export-3mf", output_path]
+
+    if profile_path and os.path.exists(profile_path):
+        cmd.extend(["--load-settings", profile_path])
+
+    cmd.append(stl_path)
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300
+        )
+
+        if result.returncode != 0:
+            raise PrinterError(f"OrcaSlicer failed: {result.stderr}")
+
+        return output_path
+
+    except subprocess.TimeoutExpired:
+        raise PrinterError("Slicing timed out after 5 minutes")
+    except FileNotFoundError:
+        raise PrinterError(f"OrcaSlicer not found at {orca_path}")
 
 
 def validate_file_path(file_path: str, allowed_dir: Path) -> Path:
@@ -140,36 +224,7 @@ class BambuPrinter:
 
     def _find_orcaslicer(self) -> Optional[str]:
         """Find OrcaSlicer executable."""
-        # Check environment variable first
-        orca_path = os.environ.get("ORCASLICER_PATH")
-        if orca_path and os.path.exists(orca_path):
-            return orca_path
-
-        # Common installation locations
-        locations = [
-            "/usr/local/bin/orca-slicer",
-            "/opt/OrcaSlicer/orca-slicer",
-            "/Applications/OrcaSlicer.app/Contents/MacOS/OrcaSlicer",
-            os.path.expanduser("~/.local/bin/orca-slicer"),
-        ]
-
-        for loc in locations:
-            if os.path.exists(loc):
-                return loc
-
-        # Try PATH
-        try:
-            result = subprocess.run(
-                ["which", "orca-slicer"],
-                capture_output=True,
-                text=True
-            )
-            if result.returncode == 0:
-                return result.stdout.strip()
-        except:
-            pass
-
-        return None
+        return find_orcaslicer()
 
     def upload_file(self, local_path: str, remote_filename: Optional[str] = None) -> str:
         """
