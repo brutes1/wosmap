@@ -170,17 +170,24 @@ download3mfUrl() {
 ## Dependencies & Risks
 
 **Dependencies:**
-- OrcaSlicer must be installed on the backend container
-- Current Docker image may need OrcaSlicer added
+- OrcaSlicer must be installed and accessible via PATH or ORCASLICER_PATH env var
+- 3MF button is conditionally shown based on /api/capabilities endpoint
 
 **Risks:**
 - Slicing can take 30-60 seconds - first 3MF download will be slow
 - OrcaSlicer settings format may differ between versions
 
 **Mitigations:**
-- Show loading indicator during 3MF generation
+- Frontend checks /api/capabilities and only shows 3MF button when slicer is available
 - Pre-slice 3MF during job completion (optional optimization)
 - Document required OrcaSlicer version
+
+## Implementation Notes
+
+**OrcaSlicer in Docker:** Due to cross-platform complexity (AppImages require x86_64, Flatpak requires user namespaces), OrcaSlicer is not included in the Docker image. To enable 3MF downloads:
+1. Install OrcaSlicer locally and set ORCASLICER_PATH
+2. Or run the backend outside Docker with OrcaSlicer installed
+3. The frontend gracefully hides 3MF buttons when slicer is unavailable
 
 ## References
 

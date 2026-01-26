@@ -116,14 +116,14 @@
           <a :href="downloadUrl" class="btn-secondary" download>
             Download STL
           </a>
-          <a :href="download3mfUrl" class="btn-secondary" download>
+          <a v-if="slicerAvailable" :href="download3mfUrl" class="btn-secondary" download>
             Download 3MF
           </a>
           <button class="btn-secondary" @click="showPrinterModal = true">
             Send to Printer
           </button>
         </div>
-        <p class="download-note">3MF is pre-sliced with ironing for smooth tactile surfaces (0.3mm layers, 20% ironing)</p>
+        <p v-if="slicerAvailable" class="download-note">3MF is pre-sliced with ironing for smooth tactile surfaces (0.3mm layers, 20% ironing)</p>
       </section>
 
       <!-- History -->
@@ -149,7 +149,7 @@
             </div>
             <div class="history-buttons">
               <a :href="getJobDownloadUrl(job.job_id)" class="btn-small" download>STL</a>
-              <a :href="getJob3mfUrl(job.job_id)" class="btn-small btn-small-alt" download>3MF</a>
+              <a v-if="slicerAvailable" :href="getJob3mfUrl(job.job_id)" class="btn-small btn-small-alt" download>3MF</a>
             </div>
           </div>
 
@@ -273,11 +273,17 @@ export default {
       // History
       history: [],
       showHistory: false,
+
+      // Capabilities
+      slicerAvailable: false,
     }
   },
 
   async mounted() {
-    await this.loadHistory()
+    await Promise.all([
+      this.loadHistory(),
+      this.loadCapabilities(),
+    ])
   },
 
   computed: {
@@ -392,6 +398,17 @@ export default {
 
       } catch (err) {
         alert('Failed to send to printer: ' + err.message)
+      }
+    },
+
+    async loadCapabilities() {
+      try {
+        const response = await fetch('/api/capabilities')
+        const data = await response.json()
+        this.slicerAvailable = data.slicer_available
+      } catch (err) {
+        console.error('Failed to load capabilities:', err)
+        this.slicerAvailable = false
       }
     },
 

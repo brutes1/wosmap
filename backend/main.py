@@ -135,6 +135,20 @@ async def health_check():
     }
 
 
+@app.get("/api/capabilities")
+async def get_capabilities():
+    """Get server capabilities including available features."""
+    from printer import find_orcaslicer
+
+    orca_path = find_orcaslicer()
+
+    return {
+        "slicer_available": orca_path is not None,
+        "slicer_path": orca_path,
+        "download_formats": ["stl", "svg"] + (["3mf"] if orca_path else []),
+    }
+
+
 @app.post("/api/maps", response_model=MapResponse)
 async def create_map(request: MapRequest):
     """

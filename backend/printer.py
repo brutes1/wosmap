@@ -78,6 +78,7 @@ def slice_to_3mf(stl_path: str, output_path: str, profile_path: Optional[str] = 
     Slice an STL file to 3MF using OrcaSlicer CLI.
 
     This standalone function doesn't require printer configuration.
+    Runs OrcaSlicer with xvfb for headless operation in Docker.
 
     Args:
         stl_path: Path to input STL file
@@ -96,29 +97,46 @@ def slice_to_3mf(stl_path: str, output_path: str, profile_path: Optional[str] = 
             "OrcaSlicer not found. Install from https://github.com/SoftFever/OrcaSlicer"
         )
 
-    cmd = [orca_path, "--export-3mf", output_path]
+    # Build the OrcaSlicer command
+    orca_cmd = [orca_path, "--export-3mf", output_path]
 
     if profile_path and os.path.exists(profile_path):
-        cmd.extend(["--load-settings", profile_path])
+        orca_cmd.extend(["--load-settings", profile_path])
 
-    cmd.append(stl_path)
+    orca_cmd.append(stl_path)
+
+    # Check if we need to use xvfb (headless display) for Docker environments
+    use_xvfb = os.environ.get("DISPLAY") is None
+
+    if use_xvfb:
+        # Run with xvfb-run for headless operation
+        cmd = ["xvfb-run", "-a", "--server-args=-screen 0 1024x768x24"] + orca_cmd
+    else:
+        cmd = orca_cmd
 
     try:
         result = subprocess.run(
             cmd,
             capture_output=True,
             text=True,
-            timeout=300
+            timeout=300,
+            env={**os.environ, "QT_QPA_PLATFORM": "offscreen"}
         )
 
         if result.returncode != 0:
             raise PrinterError(f"OrcaSlicer failed: {result.stderr}")
 
+        # Verify output file was created
+        if not os.path.exists(output_path):
+            raise PrinterError(f"OrcaSlicer did not produce output file. stdout: {result.stdout}, stderr: {result.stderr}")
+
         return output_path
 
     except subprocess.TimeoutExpired:
         raise PrinterError("Slicing timed out after 5 minutes")
-    except FileNotFoundError:
+    except FileNotFoundError as e:
+        if "xvfb-run" in str(e):
+            raise PrinterError("xvfb-run not found. Install xvfb package for headless operation.")
         raise PrinterError(f"OrcaSlicer not found at {orca_path}")
 
 
