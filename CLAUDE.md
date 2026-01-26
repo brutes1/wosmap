@@ -4,9 +4,11 @@ This document provides context and guidelines for AI assistants working with the
 
 ## Project Overview
 
-**WOSMap** (Worth One's Salt Map) is a tactile map generator that creates 3D-printable maps for the visually impaired. Users enter an address or GPS coordinates, customize print settings, and receive an STL file ready for 3D printing. Optional integration with Bambu X1C printers for direct printing.
+**WOSMap** (Worth One's Salt Map) creates 3D-printable maps of meaningful locations for preserving memories. Users enter an address or GPS coordinates of a place that matters to them—a childhood home, where they met someone special, or any location with personal significance—and receive an STL file ready for 3D printing.
 
-Based on the [touch-mapper](https://github.com/skarkkai/touch-mapper) project, optimized for local Docker execution.
+*"Capture the world exactly as it was the moment your story changed."*
+
+The technical implementation is based on the [touch-mapper](https://github.com/skarkkai/touch-mapper) project, adapted for local Docker execution with optional Bambu X1C printer integration.
 
 ## Architecture
 
