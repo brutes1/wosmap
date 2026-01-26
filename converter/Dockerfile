@@ -55,7 +55,8 @@ RUN pip3 install --no-cache-dir \
     redis \
     requests \
     cairosvg \
-    svgwrite
+    svgwrite \
+    overturemaps
 
 # Install Blender from Ubuntu repository (supports ARM64)
 # Note: Ubuntu 22.04 provides Blender 3.0, which is older but works on ARM64

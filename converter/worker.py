@@ -32,14 +32,28 @@ def signal_handler(signum, frame):
 
 
 def update_job_status(r: redis.Redis, job_id: str, status: str, data: dict = None):
-    """Update job status in Redis."""
-    result = {
-        "status": status,
-        "updated_at": datetime.utcnow().isoformat(),
-    }
+    """Update job status in Redis, preserving existing fields like location_name."""
+    # Get existing job data to preserve fields like location_name
+    existing = r.get(f"result:{job_id}")
+    if existing:
+        result = json.loads(existing)
+    else:
+        result = {}
+
+    # Update with new status
+    result["status"] = status
+    result["updated_at"] = datetime.utcnow().isoformat()
+
     if data:
         result.update(data)
     r.set(f"result:{job_id}", json.dumps(result))
+
+
+def make_status_callback(r: redis.Redis, job_id: str):
+    """Create a callback function for updating job processing stage."""
+    def update_stage(stage: str, message: str = None):
+        update_job_status(r, job_id, stage, {"stage_message": message} if message else None)
+    return update_stage
 
 
 def main():
@@ -81,11 +95,11 @@ def main():
                 job_id = job.get("id", "unknown")
                 print(f"Job ID: {job_id}")
 
-                # Update status to processing
-                update_job_status(r, job_id, "processing")
+                # Create status callback for granular updates
+                status_callback = make_status_callback(r, job_id)
 
-                # Process the job
-                result = process_map_request(job, WORK_DIR)
+                # Process the job with status callback
+                result = process_map_request(job, WORK_DIR, status_callback=status_callback)
 
                 # Update status to completed
                 update_job_status(r, job_id, "completed", result)

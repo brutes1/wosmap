@@ -3,8 +3,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install curl for healthcheck
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# Install system dependencies
+# Note: OrcaSlicer is not included in Docker due to cross-platform complexity.
+# 3MF download requires OrcaSlicer to be installed on the host or set ORCASLICER_PATH.
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
 COPY backend/requirements.txt .
@@ -12,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY backend/*.py .
+COPY backend/profiles ./profiles
 
 # Environment variables
 ENV REDIS_HOST=redis

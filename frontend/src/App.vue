@@ -2,7 +2,7 @@
   <div class="container">
     <header>
       <h1>WOSMap</h1>
-      <p class="subtitle">Create 3D-printable tactile maps for the visually impaired</p>
+      <p class="subtitle">Capture the world exactly as it was the moment your story changed</p>
     </header>
 
     <main>
@@ -63,11 +63,11 @@
         <div class="radio-group">
           <label>
             <input type="radio" v-model="dataSource" value="osm" :disabled="isProcessing" />
-            OpenStreetMap (default)
+            OpenStreetMap (community-sourced)
           </label>
           <label>
-            <input type="radio" v-model="dataSource" value="osm_ms" :disabled="isProcessing" />
-            OSM + Microsoft Buildings (better coverage)
+            <input type="radio" v-model="dataSource" value="overture" :disabled="isProcessing" />
+            Overture Maps (OSM + Microsoft + Google + Esri)
           </label>
         </div>
       </section>
@@ -84,9 +84,17 @@
       <!-- Status -->
       <section v-if="status" class="card status-card" :class="statusClass">
         <h3>Status</h3>
-        <p class="status-message">{{ statusMessage }}</p>
-        <div v-if="isProcessing" class="progress-bar">
-          <div class="progress-bar-fill"></div>
+        <p class="status-message">{{ stageMessage || statusMessage }}</p>
+        <div v-if="isProcessing" class="progress-stages">
+          <div
+            v-for="stage in stages"
+            :key="stage.id"
+            class="stage"
+            :class="{ active: currentStage === stage.id, done: isStageCompleted(stage.id) }"
+          >
+            <span class="stage-icon">{{ isStageCompleted(stage.id) ? 'done' : (currentStage === stage.id ? 'pending' : 'radio_button_unchecked') }}</span>
+            <span class="stage-label">{{ stage.label }}</span>
+          </div>
         </div>
         <p v-if="error" class="error">{{ error }}</p>
       </section>
@@ -94,12 +102,59 @@
       <!-- Results -->
       <section v-if="completed" class="card results-card">
         <h3>Map Ready</h3>
+
+        <div v-if="fileInfo" class="file-details">
+          <p class="filename">{{ fileInfo.filename }}</p>
+          <div class="file-stats">
+            <span><strong>Size:</strong> {{ fileInfo.size_human }}</span>
+            <span><strong>Triangles:</strong> {{ formatNumber(fileInfo.triangles) }}</span>
+            <span><strong>Dimensions:</strong> {{ fileInfo.dimensions?.x_mm }} x {{ fileInfo.dimensions?.y_mm }} x {{ fileInfo.dimensions?.z_mm }} mm</span>
+          </div>
+        </div>
+
         <div class="button-row">
           <a :href="downloadUrl" class="btn-secondary" download>
             Download STL
           </a>
+          <a v-if="slicerAvailable" :href="download3mfUrl" class="btn-secondary" download>
+            Download 3MF
+          </a>
           <button class="btn-secondary" @click="showPrinterModal = true">
             Send to Printer
+          </button>
+        </div>
+        <p v-if="slicerAvailable" class="download-note">3MF is pre-sliced with ironing for smooth tactile surfaces (0.3mm layers, 20% ironing)</p>
+      </section>
+
+      <!-- History -->
+      <section class="card history-card">
+        <div class="history-header" @click="showHistory = !showHistory">
+          <h2>History ({{ history.length }})</h2>
+          <span class="toggle-icon">{{ showHistory ? '▼' : '►' }}</span>
+        </div>
+
+        <div v-if="showHistory" class="history-content">
+          <div v-if="history.length === 0" class="empty-history">
+            No maps generated yet
+          </div>
+
+          <div v-for="job in history" :key="job.job_id" class="history-item">
+            <div class="history-info">
+              <span class="history-location">{{ job.location_name }}</span>
+              <span class="history-date">{{ formatDate(job.created_at) }}</span>
+            </div>
+            <div class="history-stats">
+              <span>{{ job.file_info?.size_human }}</span>
+              <span>{{ formatNumber(job.file_info?.triangles) }} triangles</span>
+            </div>
+            <div class="history-buttons">
+              <a :href="getJobDownloadUrl(job.job_id)" class="btn-small" download>STL</a>
+              <a v-if="slicerAvailable" :href="getJob3mfUrl(job.job_id)" class="btn-small btn-small-alt" download>3MF</a>
+            </div>
+          </div>
+
+          <button v-if="history.length > 0" class="btn-danger" @click="clearAllHistory">
+            Clear All History
           </button>
         </div>
       </section>
@@ -168,7 +223,7 @@
 </template>
 
 <script>
-import { createMap, getMapStatus, getDownloadUrl, configurePrinter, sendToPrinter, pollUntilComplete } from './api.js'
+import { createMap, getMapStatus, getDownloadUrl, configurePrinter, sendToPrinter, pollUntilComplete, getHistory, clearHistory } from './api.js'
 import MapSelector from './components/MapSelector.vue'
 
 export default {
@@ -188,7 +243,7 @@ export default {
       scale: 3463,
       sizeCm: 23,
       includeBuildings: true,
-      dataSource: 'osm',
+      dataSource: 'overture',
 
       // Status
       status: null,
@@ -196,13 +251,39 @@ export default {
       jobId: null,
       completed: false,
       isProcessing: false,
+      currentStage: null,
+      stageMessage: null,
+      fileInfo: null,
+
+      // Processing stages
+      stages: [
+        { id: 'queued', label: 'Queued' },
+        { id: 'fetching_osm', label: 'Fetching OSM' },
+        { id: 'fetching_overture', label: 'Fetching Overture' },
+        { id: 'converting', label: 'Converting' },
+        { id: 'finalizing', label: 'Finalizing' },
+      ],
 
       // Printer
       showPrinterModal: false,
       printerIp: '',
       printerAccessCode: '',
       printerSerial: '',
+
+      // History
+      history: [],
+      showHistory: false,
+
+      // Capabilities
+      slicerAvailable: false,
     }
+  },
+
+  async mounted() {
+    await Promise.all([
+      this.loadHistory(),
+      this.loadCapabilities(),
+    ])
   },
 
   computed: {
@@ -215,7 +296,10 @@ export default {
       if (!this.status) return ''
       switch (this.status) {
         case 'queued': return 'Job queued, waiting for worker...'
-        case 'processing': return 'Generating tactile map...'
+        case 'fetching_osm': return 'Fetching map data from OpenStreetMap...'
+        case 'fetching_overture': return 'Fetching building data from Overture Maps...'
+        case 'converting': return 'Converting to 3D model...'
+        case 'finalizing': return 'Computing file metadata...'
         case 'completed': return 'Map generation complete!'
         case 'failed': return 'Map generation failed'
         default: return this.status
@@ -223,16 +307,22 @@ export default {
     },
 
     statusClass() {
+      const processingStages = ['queued', 'fetching_osm', 'fetching_overture', 'converting', 'finalizing']
       return {
         'status-completed': this.status === 'completed',
         'status-failed': this.status === 'failed',
-        'status-processing': this.status === 'queued' || this.status === 'processing',
+        'status-processing': processingStages.includes(this.status),
       }
     },
 
     downloadUrl() {
       if (!this.jobId) return '#'
       return getDownloadUrl(this.jobId, 'stl')
+    },
+
+    download3mfUrl() {
+      if (!this.jobId) return '#'
+      return getDownloadUrl(this.jobId, '3mf')
     },
   },
 
@@ -242,6 +332,9 @@ export default {
       this.completed = false
       this.isProcessing = true
       this.status = 'queued'
+      this.currentStage = 'queued'
+      this.stageMessage = null
+      this.fileInfo = null
 
       try {
         const params = {
@@ -257,10 +350,19 @@ export default {
         const response = await createMap(params)
         this.jobId = response.job_id
 
-        // Poll for completion
-        const result = await pollUntilComplete(this.jobId)
+        // Poll for completion with status callback
+        const result = await pollUntilComplete(this.jobId, (statusData) => {
+          this.status = statusData.status
+          this.currentStage = statusData.status
+          this.stageMessage = statusData.stage_message
+        })
+
         this.status = 'completed'
         this.completed = true
+        this.fileInfo = result.file_info
+
+        // Refresh history to include new job
+        await this.loadHistory()
 
       } catch (err) {
         this.status = 'failed'
@@ -268,6 +370,18 @@ export default {
       } finally {
         this.isProcessing = false
       }
+    },
+
+    isStageCompleted(stageId) {
+      const stageOrder = this.stages.map(s => s.id)
+      const currentIndex = stageOrder.indexOf(this.currentStage)
+      const stageIndex = stageOrder.indexOf(stageId)
+      return stageIndex < currentIndex
+    },
+
+    formatNumber(num) {
+      if (num === null || num === undefined) return '-'
+      return num.toLocaleString()
     },
 
     async savePrinterAndPrint() {
@@ -285,6 +399,50 @@ export default {
       } catch (err) {
         alert('Failed to send to printer: ' + err.message)
       }
+    },
+
+    async loadCapabilities() {
+      try {
+        const response = await fetch('/api/capabilities')
+        const data = await response.json()
+        this.slicerAvailable = data.slicer_available
+      } catch (err) {
+        console.error('Failed to load capabilities:', err)
+        this.slicerAvailable = false
+      }
+    },
+
+    async loadHistory() {
+      try {
+        const result = await getHistory()
+        this.history = result.jobs.filter(j => j.status === 'completed')
+      } catch (err) {
+        console.error('Failed to load history:', err)
+      }
+    },
+
+    async clearAllHistory() {
+      if (!confirm('Delete all generated maps? This cannot be undone.')) return
+      try {
+        await clearHistory()
+        this.history = []
+      } catch (err) {
+        alert('Failed to clear history: ' + err.message)
+      }
+    },
+
+    formatDate(isoString) {
+      if (!isoString) return ''
+      const date = new Date(isoString)
+      return date.toLocaleDateString()
+    },
+
+    getJobDownloadUrl(jobId) {
+      return getDownloadUrl(jobId, 'stl')
+    },
+
+    getJob3mfUrl(jobId) {
+      return getDownloadUrl(jobId, '3mf')
     },
   },
 }
@@ -451,30 +609,47 @@ header h1 {
   border-left: 4px solid #dc3545;
 }
 
-.progress-bar {
-  height: 4px;
-  background: #eee;
-  border-radius: 2px;
-  margin-top: 12px;
-  overflow: hidden;
-}
-
-.progress-bar-fill {
-  height: 100%;
-  background: #4a90d9;
-  width: 100%;
-  animation: progress 1.5s ease-in-out infinite;
-}
-
-@keyframes progress {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
 .error {
   color: #dc3545;
   font-size: 14px;
   margin-top: 8px;
+}
+
+.progress-stages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.stage {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: #f5f5f5;
+  border-radius: 16px;
+  font-size: 12px;
+  color: #999;
+}
+
+.stage.active {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.stage.done {
+  background: #e8f5e9;
+  color: #388e3c;
+}
+
+.stage-icon {
+  font-family: 'Material Icons', sans-serif;
+  font-size: 14px;
+}
+
+.stage-label {
+  font-weight: 500;
 }
 
 .results-card {
@@ -486,6 +661,44 @@ header h1 {
 .results-card h3 {
   color: #28a745;
   margin-bottom: 16px;
+}
+
+.download-note {
+  font-size: 11px;
+  color: #666;
+  margin-top: 12px;
+}
+
+.file-details {
+  margin-bottom: 16px;
+  text-align: left;
+  background: #f9f9f9;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.filename {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+
+.file-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #666;
+}
+
+.file-stats span {
+  white-space: nowrap;
+}
+
+.file-stats strong {
+  color: #444;
 }
 
 /* Modal */
@@ -533,5 +746,128 @@ footer {
 
 footer a {
   color: #666;
+}
+
+/* History */
+.history-card {
+  margin-top: 20px;
+}
+
+.history-card h2 {
+  margin-bottom: 0;
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-icon {
+  color: #666;
+  font-size: 12px;
+}
+
+.history-content {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #eee;
+}
+
+.empty-history {
+  color: #999;
+  font-size: 14px;
+  text-align: center;
+  padding: 20px;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #f9f9f9;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.history-info {
+  flex: 1;
+}
+
+.history-location {
+  display: block;
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+}
+
+.history-date {
+  display: block;
+  font-size: 12px;
+  color: #999;
+}
+
+.history-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-size: 12px;
+  color: #666;
+  gap: 2px;
+}
+
+.history-buttons {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-small {
+  padding: 6px 12px;
+  background: #4a90d9;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.btn-small:hover {
+  background: #3a7bc8;
+}
+
+.btn-small-alt {
+  background: #28a745;
+}
+
+.btn-small-alt:hover {
+  background: #1e7e34;
+}
+
+.btn-danger {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  margin-top: 12px;
+  background: white;
+  color: #dc3545;
+  border: 2px solid #dc3545;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background: #dc3545;
+  color: white;
 }
 </style>

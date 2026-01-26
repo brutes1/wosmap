@@ -46,6 +46,30 @@ export function getDownloadUrl(jobId, fileType = 'stl') {
 }
 
 /**
+ * Get history of all map generation jobs.
+ */
+export async function getHistory() {
+  const response = await fetch(`${API_BASE}/maps`)
+  if (!response.ok) {
+    throw new Error('Failed to get history')
+  }
+  return response.json()
+}
+
+/**
+ * Clear all map generation history and delete files.
+ */
+export async function clearHistory() {
+  const response = await fetch(`${API_BASE}/maps`, {
+    method: 'DELETE',
+  })
+  if (!response.ok) {
+    throw new Error('Failed to clear history')
+  }
+  return response.json()
+}
+
+/**
  * Configure the Bambu X1C printer.
  */
 export async function configurePrinter(config) {
@@ -91,10 +115,19 @@ export async function sendToPrinter(jobId) {
 
 /**
  * Poll for job completion.
+ * @param {string} jobId - The job ID to poll
+ * @param {function} onStatusUpdate - Optional callback called with status object on each poll
+ * @param {number} interval - Polling interval in ms (default 2000)
+ * @param {number} maxAttempts - Maximum poll attempts (default 300)
  */
-export async function pollUntilComplete(jobId, interval = 2000, maxAttempts = 300) {
+export async function pollUntilComplete(jobId, onStatusUpdate = null, interval = 2000, maxAttempts = 300) {
   for (let i = 0; i < maxAttempts; i++) {
     const status = await getMapStatus(jobId)
+
+    // Call the status update callback if provided
+    if (onStatusUpdate) {
+      onStatusUpdate(status)
+    }
 
     if (status.status === 'completed') {
       return status

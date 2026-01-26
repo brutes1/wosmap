@@ -34,6 +34,136 @@ class PrinterError(Exception):
     pass
 
 
+# Security: Define allowed directories for file operations
+MAPS_DIR = Path(os.environ.get("MAPS_DIR", "/data/maps"))
+PROFILES_DIR = Path(__file__).parent / "profiles"
+
+
+def find_orcaslicer() -> Optional[str]:
+    """Find OrcaSlicer executable."""
+    # Check environment variable first
+    orca_path = os.environ.get("ORCASLICER_PATH")
+    if orca_path and os.path.exists(orca_path):
+        return orca_path
+
+    # Common installation locations
+    locations = [
+        "/usr/local/bin/orca-slicer",
+        "/opt/OrcaSlicer/orca-slicer",
+        "/Applications/OrcaSlicer.app/Contents/MacOS/OrcaSlicer",
+        os.path.expanduser("~/.local/bin/orca-slicer"),
+    ]
+
+    for loc in locations:
+        if os.path.exists(loc):
+            return loc
+
+    # Try PATH
+    try:
+        result = subprocess.run(
+            ["which", "orca-slicer"],
+            capture_output=True,
+            text=True
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+    except:
+        pass
+
+    return None
+
+
+def slice_to_3mf(stl_path: str, output_path: str, profile_path: Optional[str] = None) -> str:
+    """
+    Slice an STL file to 3MF using OrcaSlicer CLI.
+
+    This standalone function doesn't require printer configuration.
+    Runs OrcaSlicer with xvfb for headless operation in Docker.
+
+    Args:
+        stl_path: Path to input STL file
+        output_path: Path for output 3MF file
+        profile_path: Optional path to slicing profile JSON
+
+    Returns:
+        Path to the sliced 3MF file
+
+    Raises:
+        PrinterError: If slicing fails or OrcaSlicer not found
+    """
+    orca_path = find_orcaslicer()
+    if orca_path is None:
+        raise PrinterError(
+            "OrcaSlicer not found. Install from https://github.com/SoftFever/OrcaSlicer"
+        )
+
+    # Build the OrcaSlicer command
+    orca_cmd = [orca_path, "--export-3mf", output_path]
+
+    if profile_path and os.path.exists(profile_path):
+        orca_cmd.extend(["--load-settings", profile_path])
+
+    orca_cmd.append(stl_path)
+
+    # Check if we need to use xvfb (headless display) for Docker environments
+    use_xvfb = os.environ.get("DISPLAY") is None
+
+    if use_xvfb:
+        # Run with xvfb-run for headless operation
+        cmd = ["xvfb-run", "-a", "--server-args=-screen 0 1024x768x24"] + orca_cmd
+    else:
+        cmd = orca_cmd
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=300,
+            env={**os.environ, "QT_QPA_PLATFORM": "offscreen"}
+        )
+
+        if result.returncode != 0:
+            raise PrinterError(f"OrcaSlicer failed: {result.stderr}")
+
+        # Verify output file was created
+        if not os.path.exists(output_path):
+            raise PrinterError(f"OrcaSlicer did not produce output file. stdout: {result.stdout}, stderr: {result.stderr}")
+
+        return output_path
+
+    except subprocess.TimeoutExpired:
+        raise PrinterError("Slicing timed out after 5 minutes")
+    except FileNotFoundError as e:
+        if "xvfb-run" in str(e):
+            raise PrinterError("xvfb-run not found. Install xvfb package for headless operation.")
+        raise PrinterError(f"OrcaSlicer not found at {orca_path}")
+
+
+def validate_file_path(file_path: str, allowed_dir: Path) -> Path:
+    """
+    Security: Validate that a file path is within the allowed directory.
+
+    Args:
+        file_path: Path to validate
+        allowed_dir: Directory that must contain the file
+
+    Returns:
+        Resolved Path object
+
+    Raises:
+        PrinterError: If path is outside allowed directory
+    """
+    path = Path(file_path)
+    try:
+        resolved = path.resolve()
+        if not resolved.is_relative_to(allowed_dir.resolve()):
+            raise PrinterError(f"Access denied: file must be within {allowed_dir}")
+        return resolved
+    except ValueError:
+        raise PrinterError("Access denied: invalid file path")
+
+
 class BambuPrinter:
     """
     Client for Bambu Lab X1C printer.
@@ -112,36 +242,7 @@ class BambuPrinter:
 
     def _find_orcaslicer(self) -> Optional[str]:
         """Find OrcaSlicer executable."""
-        # Check environment variable first
-        orca_path = os.environ.get("ORCASLICER_PATH")
-        if orca_path and os.path.exists(orca_path):
-            return orca_path
-
-        # Common installation locations
-        locations = [
-            "/usr/local/bin/orca-slicer",
-            "/opt/OrcaSlicer/orca-slicer",
-            "/Applications/OrcaSlicer.app/Contents/MacOS/OrcaSlicer",
-            os.path.expanduser("~/.local/bin/orca-slicer"),
-        ]
-
-        for loc in locations:
-            if os.path.exists(loc):
-                return loc
-
-        # Try PATH
-        try:
-            result = subprocess.run(
-                ["which", "orca-slicer"],
-                capture_output=True,
-                text=True
-            )
-            if result.returncode == 0:
-                return result.stdout.strip()
-        except:
-            pass
-
-        return None
+        return find_orcaslicer()
 
     def upload_file(self, local_path: str, remote_filename: Optional[str] = None) -> str:
         """
@@ -314,6 +415,25 @@ def slice_and_print(
     Returns:
         Result dictionary
     """
+    # Security: Validate STL path is within allowed directory
+    try:
+        validated_stl = validate_file_path(stl_path, MAPS_DIR)
+    except PrinterError as e:
+        return {"status": "security_error", "error": str(e)}
+
+    # Security: Validate profile path if provided
+    if profile_path:
+        try:
+            validate_file_path(profile_path, MAPS_DIR)
+        except PrinterError as e:
+            return {"status": "security_error", "error": str(e)}
+
+    # Validate file exists and has correct extension
+    if not validated_stl.exists():
+        return {"status": "error", "error": "STL file not found"}
+    if validated_stl.suffix.lower() != '.stl':
+        return {"status": "error", "error": "File must be an STL file"}
+
     printer = BambuPrinter(
         ip=printer_config["ip"],
         access_code=printer_config["access_code"],
@@ -323,11 +443,11 @@ def slice_and_print(
     # Create temp directory for sliced file
     with tempfile.TemporaryDirectory() as tmp_dir:
         # Slice STL to 3MF
-        stl_name = os.path.splitext(os.path.basename(stl_path))[0]
+        stl_name = validated_stl.stem
         gcode_path = os.path.join(tmp_dir, f"{stl_name}.gcode.3mf")
 
         try:
-            printer.slice_stl(stl_path, gcode_path, profile_path)
+            printer.slice_stl(str(validated_stl), gcode_path, profile_path)
         except PrinterError as e:
             return {"status": "slice_failed", "error": str(e)}
 
