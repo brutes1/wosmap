@@ -30,6 +30,12 @@ BORDER_HORIZONTAL_OVERLAP_MM = 0.05
 MARKER_HEIGHT_MM = BUILDING_HEIGHT_MM + 2
 MARKER_RADIUS_MM = MARKER_HEIGHT_MM * 0.5
 
+# Park/Forest/Nature heights (tactile representation)
+FOREST_HEIGHT_MM = 0.4  # Raised slightly to be tactile
+PARK_HEIGHT_MM = 0.3    # Subtle raised area
+GRASS_HEIGHT_MM = 0.2   # Very subtle texture
+BARRIER_HEIGHT_MM = 1.0 # Fences/walls
+
 def warning(*objs):
     print("WARNING: ", *objs, file=sys.stderr)
 
@@ -148,6 +154,8 @@ def export_svg(base_path, args):
     rails = []
     rivers = []
     water_areas = []
+    forests = []
+    parks = []
     for ob in objs:
         try:
             if ob.name.startswith('Road'):
@@ -163,6 +171,14 @@ def export_svg(base_path, args):
                 water_areas.append(ob)
             elif ob.name.startswith('Building'):
                 buildings.append(ob)
+            elif ob.name.startswith('Forest') or ob.name.startswith('TreeRow'):
+                forests.append(ob)
+            elif 'Park' in ob.name or ob.name.startswith('Leisure') or ob.name.startswith('Grass'):
+                parks.append(ob)
+            elif ob.name.startswith('Tree ') or ob.name == 'Tree':
+                pass  # Skip individual trees
+            elif ob.name.startswith('Barrier') or ob.name.startswith('Fence') or ob.name.startswith('Wall'):
+                pass  # Skip barriers in SVG for now
             else:
                 print("UNHANDLED TYPE IN SVG CREATION: " + ob.name)
         except Exception as e:
@@ -176,6 +192,10 @@ def export_svg(base_path, args):
     clip_path.add(dwg.rect(insert=(min_x, min_y), size=(max_x - min_x, max_y - min_y)))
     main_g = dwg.add(dwg.g(clip_path='url(#main_clip)'))
 
+    for ob in forests:
+        add_svg_object(dwg, main_g, ob, rgb(20, 60, 20))  # Dark green for forests
+    for ob in parks:
+        add_svg_object(dwg, main_g, ob, rgb(40, 80, 40))  # Lighter green for parks
     for ob in rails:
         add_svg_object(dwg, main_g, ob, rgb(0, 50, 0))
     for ob in rivers:
@@ -626,6 +646,11 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
     joinable_waterways = []
     inner_water_areas = []
     deleteables = []
+    # New: parks, forests, grass, barriers from TreeModule/SurfaceAreaModule/BarrierModule
+    forests = []
+    parks = []
+    grass_areas = []
+    barriers = []
     for ob in all_mesh_objects():
         if ob.name.startswith('BuildingEntrance'):
             deleteables.append(ob)
@@ -644,6 +669,16 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
                     roads_car.append(ob)
         elif ob.name.startswith('Rail'):
             rails.append(ob)
+        # New: Handle forest, park, grass, barrier objects from TreeModule/SurfaceAreaModule/BarrierModule
+        elif ob.name.startswith('Forest') or ob.name.startswith('TreeRow'):
+            forests.append(ob)
+        elif ob.name.startswith('GrassArea') or ob.name.startswith('Grass'):
+            grass_areas.append(ob)
+        elif ob.name.startswith('Barrier') or ob.name.startswith('Fence') or ob.name.startswith('Wall'):
+            barriers.append(ob)
+        # Trees are too small for tactile maps, skip them
+        elif ob.name.startswith('Tree ') or ob.name == 'Tree':
+            deleteables.append(ob)
         else:
             n_total = len(ob.data.vertices)
             n_outside = 0
@@ -657,6 +692,9 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
                     joinable_waterways.append(ob)
                 elif ob.name.startswith('Water') or ob.name.startswith('AreaFountain'):
                     inner_water_areas.append(ob)
+                # Handle parks (leisure=park) - often named "Park" or similar by SurfaceAreaModule
+                elif 'Park' in ob.name or ob.name.startswith('Leisure'):
+                    parks.append(ob)
                 else:
                     print("UNHANDLED INNER OBJECT TYPE: " + ob.name)
             elif n_outside == n_total:
@@ -666,6 +704,9 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
                     clippable_waterways.append(ob)
                 elif ob.name.startswith('Water') or ob.name.startswith('AreaFountain'):
                     clippable_water_areas.append(ob)
+                # Handle parks that span outside the map area
+                elif 'Park' in ob.name or ob.name.startswith('Leisure'):
+                    parks.append(ob)
                 else:
                     print("UNHANDLED CLIPPABLE OBJECT TYPE: " + ob.name)
     print("initial steps took %.2f" % (time.perf_counter() - t))
@@ -723,6 +764,38 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
     do_road_areas(joined_road_areas_ped, ROAD_HEIGHT_PEDESTRIAN_MM * mm_to_units)
     do_ways(joined_roads_car, ROAD_HEIGHT_CAR_MM * mm_to_units, min_x, min_y, max_x, max_y)
     do_ways(joined_roads_ped, ROAD_HEIGHT_PEDESTRIAN_MM * mm_to_units, min_x, min_y, max_x, max_y)
+
+    # Forests and parks (from TreeModule and SurfaceAreaModule)
+    t = time.perf_counter()
+    if len(forests) > 0:
+        joined_forests = join_and_clip(forests, min_co, max_co, 'Forests')
+        if joined_forests:
+            raise_ob(joined_forests, FOREST_HEIGHT_MM * mm_to_units)
+            fatten(joined_forests)
+        print("processing %d forests took %.2f" % (len(forests), time.perf_counter() - t))
+
+    if len(parks) > 0:
+        t = time.perf_counter()
+        joined_parks = join_and_clip(parks, min_co, max_co, 'Parks')
+        if joined_parks:
+            raise_ob(joined_parks, PARK_HEIGHT_MM * mm_to_units)
+            fatten(joined_parks)
+        print("processing %d parks took %.2f" % (len(parks), time.perf_counter() - t))
+
+    if len(grass_areas) > 0:
+        t = time.perf_counter()
+        joined_grass = join_and_clip(grass_areas, min_co, max_co, 'GrassAreas')
+        if joined_grass:
+            raise_ob(joined_grass, GRASS_HEIGHT_MM * mm_to_units)
+        print("processing %d grass areas took %.2f" % (len(grass_areas), time.perf_counter() - t))
+
+    if len(barriers) > 0:
+        t = time.perf_counter()
+        joined_barriers = join_and_clip(barriers, min_co, max_co, 'Barriers')
+        if joined_barriers:
+            raise_ob(joined_barriers, BARRIER_HEIGHT_MM * mm_to_units)
+            fatten(joined_barriers)
+        print("processing %d barriers took %.2f" % (len(barriers), time.perf_counter() - t))
 
 def make_tactile_map(args):
     t = time.perf_counter()
