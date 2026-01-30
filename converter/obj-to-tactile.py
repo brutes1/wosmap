@@ -254,6 +254,7 @@ def export_stl_by_feature(base_path, scale):
     feature_groups = {
         'buildings': ['Buildings'],
         'roads': ['CarRoads', 'PedestrianRoads', 'CarRoadAreas', 'PedestrianRoadAreas'],
+        'trails': ['Trails', 'TrailAreas'],
         'rails': ['Rails'],
         'water': ['ClippedWaterAreas', 'InnerWaterAreas', 'JoinedWaterways', 'ClippedWaterways'],
         'parks': ['Forests', 'Parks', 'GrassAreas'],
@@ -467,6 +468,9 @@ def water_wave_pattern(object, depth, scale):
 def is_pedestrian(road_name):
     return road_name.endswith('::pedestrian')
 
+def is_trail(road_name):
+    return road_name.endswith('::trail')
+
 ## Disable stdout buffering
 #class Unbuffered(object):
 #   def __init__(self, stream):
@@ -668,6 +672,8 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
     roads_ped = []
     road_areas_car = []
     road_areas_ped = []
+    trails = []
+    trail_areas = []
     buildings = []
     rails = []
     clippable_waterways = []
@@ -686,7 +692,13 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
         elif ob.name.startswith('Building'):
             buildings.append(ob)
         elif ob.name.startswith('Road'):
-            if is_pedestrian(ob.name):
+            if is_trail(ob.name):
+                # Trails (hiking paths, bike trails, etc.)
+                if ob.name.startswith('RoadArea'):
+                    trail_areas.append(ob)
+                else:
+                    trails.append(ob)
+            elif is_pedestrian(ob.name):
                 if ob.name.startswith('RoadArea'):
                     road_areas_ped.append(ob)
                 else:
@@ -754,6 +766,8 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
     joined_roads_ped = join_and_clip(roads_ped, min_co, max_co, 'PedestrianRoads')
     joined_road_areas_car = join_and_clip(road_areas_car, min_co, max_co, 'CarRoadAreas')
     joined_road_areas_ped = join_and_clip(road_areas_ped, min_co, max_co, 'PedestrianRoadAreas')
+    joined_trails = join_and_clip(trails, min_co, max_co, 'Trails')
+    joined_trail_areas = join_and_clip(trail_areas, min_co, max_co, 'TrailAreas')
     clipped_rails = join_and_clip(rails, min_co, max_co, 'Rails')
     joined_buildings = join_and_clip(buildings, min_co, max_co, 'Buildings')
     
@@ -793,6 +807,10 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
     do_road_areas(joined_road_areas_ped, ROAD_HEIGHT_PEDESTRIAN_MM * mm_to_units)
     do_ways(joined_roads_car, ROAD_HEIGHT_CAR_MM * mm_to_units, min_x, min_y, max_x, max_y)
     do_ways(joined_roads_ped, ROAD_HEIGHT_PEDESTRIAN_MM * mm_to_units, min_x, min_y, max_x, max_y)
+
+    # Trails (hiking paths, bike trails, etc.) - same height as pedestrian roads
+    do_road_areas(joined_trail_areas, ROAD_HEIGHT_PEDESTRIAN_MM * mm_to_units)
+    do_ways(joined_trails, ROAD_HEIGHT_PEDESTRIAN_MM * mm_to_units, min_x, min_y, max_x, max_y)
 
     # Forests and parks (from TreeModule and SurfaceAreaModule)
     t = time.perf_counter()

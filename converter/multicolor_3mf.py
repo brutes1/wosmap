@@ -18,6 +18,7 @@ import xml.etree.ElementTree as ET
 FEATURE_COLORS = {
     'buildings': {'name': 'Buildings', 'color': '#CC4444FF'},
     'roads': {'name': 'Roads', 'color': '#808080FF'},
+    'trails': {'name': 'Trails', 'color': '#8B4513FF'},  # Brown/saddle brown for trails
     'water': {'name': 'Water', 'color': '#4488CCFF'},
     'parks': {'name': 'Parks', 'color': '#44AA44FF'},
     'rails': {'name': 'Rails', 'color': '#444444FF'},

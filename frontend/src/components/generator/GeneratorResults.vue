@@ -163,6 +163,7 @@ export default {
       layers: [
         { id: 'buildings', name: 'Buildings', color: '#CC4444' },
         { id: 'roads', name: 'Roads', color: '#808080' },
+        { id: 'trails', name: 'Trails', color: '#8B4513' },
         { id: 'water', name: 'Water', color: '#4488CC' },
         { id: 'parks', name: 'Parks', color: '#44AA44' },
         { id: 'base', name: 'Base', color: '#FFFFFF' },

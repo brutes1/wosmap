@@ -7,21 +7,30 @@
       <label
         v-for="layer in layerConfig"
         :key="layer.id"
-        class="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all hover:bg-slate-50"
-        :class="{ 'opacity-50 cursor-not-allowed': disabled }"
+        class="flex items-center gap-3 p-3 rounded-xl transition-all"
+        :class="{
+          'opacity-50 cursor-not-allowed': disabled || layer.comingSoon,
+          'cursor-pointer hover:bg-slate-50': !disabled && !layer.comingSoon
+        }"
       >
         <input
           type="checkbox"
           :checked="modelValue[layer.id]"
           @change="toggleLayer(layer.id, $event.target.checked)"
-          :disabled="disabled"
+          :disabled="disabled || layer.comingSoon"
           class="w-5 h-5 rounded border-slate-300 text-primary-600 focus:ring-primary-500 disabled:opacity-50"
         />
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2">
-            <span class="font-medium text-slate-800">{{ layer.name }}</span>
+            <span class="font-medium" :class="layer.comingSoon ? 'text-slate-500' : 'text-slate-800'">{{ layer.name }}</span>
             <span
-              v-if="layer.beta"
+              v-if="layer.comingSoon"
+              class="text-xs bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full font-medium"
+            >
+              Coming Soon
+            </span>
+            <span
+              v-else-if="layer.beta"
               class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium"
             >
               Beta
@@ -69,8 +78,9 @@ const LAYER_CONFIG = [
   {
     id: 'terrain',
     name: 'Terrain/Elevation',
-    description: 'Hills, valleys, topography',
+    description: 'Coming soon - requires elevation data integration',
     beta: true,
+    comingSoon: true,
   },
 ]
 
