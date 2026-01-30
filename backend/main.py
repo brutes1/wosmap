@@ -154,10 +154,16 @@ async def get_capabilities():
 
     orca_path = find_orcaslicer()
 
+    # Multi-color 3MF is always available (no slicer needed)
+    formats = ["stl", "svg", "multicolor-3mf"]
+    if orca_path:
+        formats.append("3mf")
+
     return {
         "slicer_available": orca_path is not None,
         "slicer_path": orca_path,
-        "download_formats": ["stl", "svg"] + (["3mf"] if orca_path else []),
+        "multicolor_available": True,
+        "download_formats": formats,
     }
 
 
@@ -331,8 +337,39 @@ async def download_map(job_id: str, file_type: str = "stl"):
 
     files = data.get("files", {})
 
+    # Handle multi-color 3MF: combine feature STLs with material colors
+    if file_type == "multicolor-3mf":
+        feature_stls = files.get("feature_stls", {})
+        if not feature_stls:
+            raise HTTPException(
+                status_code=404,
+                detail="Feature STL files not available. Regenerate the map to get multi-color support."
+            )
+
+        stl_path = files.get("stl")
+        if stl_path is None:
+            raise HTTPException(status_code=404, detail="Base STL file not found")
+
+        multicolor_path = Path(stl_path).with_suffix(".multicolor.3mf")
+
+        # Check if multicolor 3MF already exists (cached)
+        if not multicolor_path.exists():
+            import sys
+            sys.path.insert(0, str(Path(__file__).parent.parent / "converter"))
+            from multicolor_3mf import create_multicolor_3mf
+
+            try:
+                create_multicolor_3mf(feature_stls, str(multicolor_path))
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Multi-color 3MF generation failed: {e}"
+                )
+
+        file_path = multicolor_path
+
     # Handle 3MF: slice on-demand if not already cached
-    if file_type == "3mf":
+    elif file_type == "3mf":
         stl_path = files.get("stl")
         if stl_path is None:
             raise HTTPException(status_code=404, detail="STL file not found for slicing")
@@ -383,6 +420,7 @@ async def download_map(job_id: str, file_type: str = "stl"):
         "blend": "application/octet-stream",
         "pdf": "application/pdf",
         "3mf": "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+        "multicolor-3mf": "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
     }
 
     # Generate user-friendly filename: wosmap_[location]_[date].stl

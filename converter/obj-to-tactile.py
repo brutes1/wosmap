@@ -248,6 +248,34 @@ def export_stl_separate(base_path, scale):
     bpy.ops.object.select_all(action='INVERT')
     _export_stl(base_path + '-rest.stl', scale)
 
+def export_stl_by_feature(base_path, scale):
+    """Export separate STL files for each feature type (for multi-color 3MF)."""
+    feature_groups = {
+        'buildings': ['Buildings'],
+        'roads': ['CarRoads', 'PedestrianRoads', 'CarRoadAreas', 'PedestrianRoadAreas'],
+        'rails': ['Rails'],
+        'water': ['ClippedWaterAreas', 'InnerWaterAreas', 'JoinedWaterways', 'ClippedWaterways'],
+        'parks': ['Forests', 'Parks', 'GrassAreas'],
+        'base': ['Base', 'Borders', 'CornerInside', 'CornerTop'],
+    }
+
+    stl_files = {}
+    for group_name, prefixes in feature_groups.items():
+        bpy.ops.object.select_all(action='DESELECT')
+        selected_count = 0
+        for ob in bpy.context.scene.objects:
+            if ob.type == 'MESH' and any(ob.name.startswith(p) or ob.name == p for p in prefixes):
+                ob.select_set(True)
+                selected_count += 1
+
+        if selected_count > 0:
+            stl_path = base_path + '.' + group_name + '.stl'
+            _export_stl(stl_path, scale)
+            stl_files[group_name] = stl_path
+            print(f"Exported {selected_count} objects to {stl_path}")
+
+    return stl_files
+
 def export_blend_file(base_path):
     blend_path = base_path + '.blend'
     bpy.ops.object.select_all(action='SELECT') # it's handy to have everything selected initially
@@ -825,6 +853,7 @@ def main():
         if not args.no_stl_export:
             export_stl(base_path, args.scale)
             export_stl_separate(base_path, args.scale)
+            export_stl_by_feature(base_path, args.scale)  # For multi-color 3MF
             export_blend_file(base_path)
     bpy.ops.object.select_all(action='SELECT') # it's handy to have everything selected when getting into UI
 

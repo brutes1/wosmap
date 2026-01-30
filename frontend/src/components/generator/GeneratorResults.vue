@@ -44,6 +44,18 @@
       </a>
 
       <a
+        v-if="multicolorAvailable"
+        :href="multicolor3mfUrl"
+        download
+        class="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-green-500 via-blue-500 to-red-500 hover:from-green-600 hover:via-blue-600 hover:to-red-600 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 transition-all"
+      >
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+        </svg>
+        Multi-Color 3MF
+      </a>
+
+      <a
         v-if="slicerAvailable"
         :href="threemfUrl"
         download
@@ -52,7 +64,7 @@
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
         </svg>
-        Download 3MF
+        Pre-Sliced 3MF
       </a>
 
       <button
@@ -66,9 +78,14 @@
       </button>
     </div>
 
-    <p v-if="slicerAvailable" class="mt-4 text-xs text-slate-500 text-center">
-      3MF is pre-sliced with ironing for smooth tactile surfaces (0.3mm layers, 20% ironing)
-    </p>
+    <div class="mt-4 text-xs text-slate-500 text-center space-y-1">
+      <p v-if="multicolorAvailable">
+        Multi-Color 3MF: parks (green), water (blue), roads (gray), buildings (red) - for AMS/multi-material printers
+      </p>
+      <p v-if="slicerAvailable">
+        Pre-Sliced 3MF: ironing for smooth tactile surfaces (0.3mm layers, 20% ironing)
+      </p>
+    </div>
   </div>
 </template>
 
@@ -89,7 +106,15 @@ export default {
       type: String,
       required: true
     },
+    multicolor3mfUrl: {
+      type: String,
+      required: true
+    },
     slicerAvailable: {
+      type: Boolean,
+      default: false
+    },
+    multicolorAvailable: {
       type: Boolean,
       default: false
     }

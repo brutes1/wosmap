@@ -165,6 +165,17 @@ def process_map_request(job: dict, work_dir: str = "/data/maps", status_callback
         if file_path.exists():
             output_files[ext] = str(file_path)
 
+    # Collect feature-specific STL files for multi-color 3MF
+    feature_stls = {}
+    for feature_type in ["buildings", "roads", "water", "parks", "rails", "base"]:
+        feature_path = job_dir / f"map.{feature_type}.stl"
+        if feature_path.exists():
+            feature_stls[feature_type] = str(feature_path)
+            output_files[f"stl_{feature_type}"] = str(feature_path)
+
+    if feature_stls:
+        output_files["feature_stls"] = feature_stls
+
     # Read metadata if available
     meta_path = job_dir / "map-meta.json"
     metadata = {}
