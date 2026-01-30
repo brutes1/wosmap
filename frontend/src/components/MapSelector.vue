@@ -178,6 +178,13 @@ export default {
       if (!this.hasMarker) {
         this.tryGeolocation()
       }
+
+      // Invalidate size after a short delay to handle flex layout sizing
+      setTimeout(() => {
+        if (this.map) {
+          this.map.invalidateSize()
+        }
+      }, 100)
     },
 
     onMapClick(e) {

@@ -89,9 +89,30 @@ export default {
 
     // Animation frame ID
     let animationId = null
+    let initRetryCount = 0
+    const MAX_INIT_RETRIES = 10
 
     function init() {
-      if (!containerRef.value || !width.value || !height.value) return
+      if (!containerRef.value) return false
+
+      // If container has no size yet, retry after a short delay
+      if (!width.value || !height.value) {
+        if (initRetryCount < MAX_INIT_RETRIES) {
+          initRetryCount++
+          setTimeout(() => {
+            const initialized = init()
+            // If we finally initialized and have a URL pending, load it
+            if (initialized && props.stlUrl) {
+              loadSTL(props.stlUrl)
+            }
+          }, 50)
+        } else {
+          console.warn('StlViewer: Container has no size after retries')
+        }
+        return false
+      }
+
+      initRetryCount = 0 // Reset for potential future reinit
 
       // Scene
       scene.value = new THREE.Scene()
@@ -139,6 +160,7 @@ export default {
 
       // Start render loop
       animate()
+      return true
     }
 
     function setupLighting() {
@@ -179,7 +201,21 @@ export default {
     }
 
     async function loadSTL(url) {
-      if (!url || !scene.value) return
+      if (!url) return
+
+      // If scene not initialized yet, try to init first
+      if (!scene.value) {
+        if (containerRef.value) {
+          const initialized = init()
+          if (!initialized) {
+            // init() will retry and call loadSTL when ready
+            return
+          }
+        } else {
+          console.warn('StlViewer: Cannot load STL - container not ready')
+          return
+        }
+      }
 
       isLoading.value = true
       error.value = null
@@ -347,10 +383,13 @@ export default {
     }
 
     onMounted(() => {
-      // Wait for container to have size
+      // Wait for next tick to ensure container is in DOM
       setTimeout(() => {
-        init()
-        if (props.stlUrl) loadSTL(props.stlUrl)
+        const initialized = init()
+        // Only load STL if init succeeded (otherwise init's retry will handle it)
+        if (initialized && props.stlUrl) {
+          loadSTL(props.stlUrl)
+        }
       }, 0)
 
       document.addEventListener('visibilitychange', handleVisibilityChange)

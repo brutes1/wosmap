@@ -56,6 +56,7 @@
         <div class="flex-1 relative min-h-[300px] md:min-h-0">
           <StlViewer
             v-if="hasPreview && downloadUrl"
+            :key="downloadUrl"
             :stl-url="downloadUrl"
             @load="onModelLoaded"
             @error="onModelError"
