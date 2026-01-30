@@ -1,22 +1,21 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+  <div class="h-screen flex flex-col bg-slate-100">
     <AppHeader />
 
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
-      <!-- Location Selection -->
-      <section class="mb-6">
-        <LocationSection
-          v-model:latitude="latitude"
-          v-model:longitude="longitude"
-          :scale="scale"
-          :size-cm="sizeCm"
-          :disabled="isProcessing"
-        />
-      </section>
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <!-- Sidebar -->
+      <aside class="w-full md:w-80 lg:w-96 flex-shrink-0 overflow-y-auto border-r border-slate-200 bg-white">
+        <div class="p-4 space-y-4">
+          <!-- Location Selection -->
+          <LocationSection
+            v-model:latitude="latitude"
+            v-model:longitude="longitude"
+            :scale="scale"
+            :size-cm="sizeCm"
+            :disabled="isProcessing"
+          />
 
-      <!-- Settings and Generate Button -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div class="lg:col-span-2">
+          <!-- Print Settings -->
           <PrintSettings
             v-model:scale="scale"
             v-model:size-cm="sizeCm"
@@ -24,44 +23,57 @@
             v-model:data-source="dataSource"
             :disabled="isProcessing"
           />
-        </div>
-        <div class="lg:col-span-1 flex items-end">
+
+          <!-- Generate Button -->
           <GenerateButton
             @click="generateMap"
             :disabled="!isValid"
             :loading="isProcessing"
           />
+
+          <!-- Progress (while generating) -->
+          <GeneratorProgress
+            v-if="isProcessing"
+            :stages="stages"
+            :current-stage="currentStage"
+            :stage-message="stageMessage"
+            :error="error"
+          />
+
+          <!-- History -->
+          <HistoryList
+            :jobs="history"
+            :slicer-available="slicerAvailable"
+            @clear="clearAllHistory"
+          />
         </div>
-      </div>
+      </aside>
 
-      <!-- Progress (while generating) -->
-      <GeneratorProgress
-        v-if="isProcessing"
-        :stages="stages"
-        :current-stage="currentStage"
-        :stage-message="stageMessage"
-        :error="error"
-      />
+      <!-- Preview Panel -->
+      <main class="flex-1 flex flex-col min-w-0 bg-slate-50">
+        <!-- 3D Viewer -->
+        <div class="flex-1 relative min-h-[300px] md:min-h-0">
+          <StlViewer
+            v-if="completed && downloadUrl"
+            :stl-url="downloadUrl"
+            @load="onModelLoaded"
+            @error="onModelError"
+          />
+          <EmptyState v-else />
+        </div>
 
-      <!-- Results (when complete) -->
-      <GeneratorResults
-        v-if="completed"
-        :file-info="fileInfo"
-        :stl-url="downloadUrl"
-        :threemf-url="download3mfUrl"
-        :slicer-available="slicerAvailable"
-        @print="showPrinterModal = true"
-      />
-
-      <!-- History -->
-      <HistoryList
-        :jobs="history"
-        :slicer-available="slicerAvailable"
-        @clear="clearAllHistory"
-      />
-    </main>
-
-    <AppFooter />
+        <!-- Download Bar (when complete) -->
+        <GeneratorResults
+          v-if="completed"
+          class="border-t border-slate-200"
+          :file-info="fileInfo"
+          :stl-url="downloadUrl"
+          :threemf-url="download3mfUrl"
+          :slicer-available="slicerAvailable"
+          @print="showPrinterModal = true"
+        />
+      </main>
+    </div>
 
     <!-- Printer Modal -->
     <PrinterModal
@@ -76,7 +88,6 @@
 import { createMap, getDownloadUrl, configurePrinter, sendToPrinter, pollUntilComplete, getHistory, clearHistory } from './api.js'
 
 import AppHeader from './components/layout/AppHeader.vue'
-import AppFooter from './components/layout/AppFooter.vue'
 import LocationSection from './components/location/LocationSection.vue'
 import PrintSettings from './components/settings/PrintSettings.vue'
 import GenerateButton from './components/generator/GenerateButton.vue'
@@ -84,20 +95,23 @@ import GeneratorProgress from './components/generator/GeneratorProgress.vue'
 import GeneratorResults from './components/generator/GeneratorResults.vue'
 import HistoryList from './components/history/HistoryList.vue'
 import PrinterModal from './components/printer/PrinterModal.vue'
+import StlViewer from './components/viewer/StlViewer.vue'
+import EmptyState from './components/viewer/EmptyState.vue'
 
 export default {
   name: 'App',
 
   components: {
     AppHeader,
-    AppFooter,
     LocationSection,
     PrintSettings,
     GenerateButton,
     GeneratorProgress,
     GeneratorResults,
     HistoryList,
-    PrinterModal
+    PrinterModal,
+    StlViewer,
+    EmptyState
   },
 
   data() {
@@ -155,12 +169,12 @@ export default {
     },
 
     downloadUrl() {
-      if (!this.jobId) return '#'
+      if (!this.jobId) return null
       return getDownloadUrl(this.jobId, 'stl')
     },
 
     download3mfUrl() {
-      if (!this.jobId) return '#'
+      if (!this.jobId) return null
       return getDownloadUrl(this.jobId, '3mf')
     }
   },
@@ -246,6 +260,14 @@ export default {
       } catch (err) {
         alert('Failed to send to printer: ' + err.message)
       }
+    },
+
+    onModelLoaded(info) {
+      console.log('3D model loaded:', info.triangles, 'triangles')
+    },
+
+    onModelError(err) {
+      console.error('Failed to load 3D model:', err)
     }
   }
 }
