@@ -380,12 +380,11 @@ async def download_map(job_id: str, file_type: str = "stl"):
 
         # Check if 3MF already exists (cached)
         if not threemf_path.exists():
-            from printer import slice_to_3mf, PrinterError, PROFILES_DIR
-
-            profile_path = PROFILES_DIR / "tactile_map_ironing.json"
+            from printer import slice_to_3mf, PrinterError
 
             try:
-                slice_to_3mf(str(stl_path), str(threemf_path), str(profile_path))
+                # Slice without profile - OrcaSlicer uses sensible defaults
+                slice_to_3mf(str(stl_path), str(threemf_path))
             except PrinterError as e:
                 raise HTTPException(
                     status_code=500,
