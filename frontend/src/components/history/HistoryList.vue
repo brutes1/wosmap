@@ -54,20 +54,10 @@
               STL
             </a>
             <a
-              v-if="multicolorAvailable"
-              :href="getMulticolor3mfUrl(job.job_id)"
-              download
-              class="px-3 py-1.5 bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white text-sm font-medium rounded-lg transition-colors"
-              title="Multi-color 3MF for AMS printers"
-            >
-              Color
-            </a>
-            <a
               v-if="slicerAvailable"
               :href="get3mfUrl(job.job_id)"
               download
-              class="px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white text-sm font-medium rounded-lg transition-colors"
-              title="Pre-sliced 3MF"
+              class="px-3 py-1.5 bg-slate-600 hover:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors"
             >
               3MF
             </a>
@@ -100,10 +90,6 @@ export default {
     slicerAvailable: {
       type: Boolean,
       default: false
-    },
-    multicolorAvailable: {
-      type: Boolean,
-      default: true
     }
   },
 
@@ -133,10 +119,6 @@ export default {
 
     get3mfUrl(jobId) {
       return getDownloadUrl(jobId, '3mf')
-    },
-
-    getMulticolor3mfUrl(jobId) {
-      return getDownloadUrl(jobId, 'multicolor-3mf')
     },
 
     handleClear() {

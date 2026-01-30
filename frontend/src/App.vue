@@ -50,12 +50,11 @@
       <!-- Results (when complete) -->
       <GeneratorResults
         v-if="completed"
+        :job-id="jobId"
         :file-info="fileInfo"
         :stl-url="downloadUrl"
         :threemf-url="download3mfUrl"
-        :multicolor3mf-url="downloadMulticolor3mfUrl"
         :slicer-available="slicerAvailable"
-        :multicolor-available="multicolorAvailable"
         @print="showPrinterModal = true"
       />
 
@@ -63,7 +62,6 @@
       <HistoryList
         :jobs="history"
         :slicer-available="slicerAvailable"
-        :multicolor-available="multicolorAvailable"
         @clear="clearAllHistory"
       />
     </main>
@@ -158,8 +156,7 @@ export default {
       history: [],
 
       // Capabilities
-      slicerAvailable: false,
-      multicolorAvailable: false
+      slicerAvailable: false
     }
   },
 
@@ -183,11 +180,6 @@ export default {
     download3mfUrl() {
       if (!this.jobId) return '#'
       return getDownloadUrl(this.jobId, '3mf')
-    },
-
-    downloadMulticolor3mfUrl() {
-      if (!this.jobId) return '#'
-      return getDownloadUrl(this.jobId, 'multicolor-3mf')
     }
   },
 
@@ -239,11 +231,9 @@ export default {
         const response = await fetch('/api/capabilities')
         const data = await response.json()
         this.slicerAvailable = data.slicer_available
-        this.multicolorAvailable = data.multicolor_available ?? true
       } catch (err) {
         console.error('Failed to load capabilities:', err)
         this.slicerAvailable = false
-        this.multicolorAvailable = true // Multi-color is always available (no slicer needed)
       }
     },
 

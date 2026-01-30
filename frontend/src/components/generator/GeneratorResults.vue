@@ -30,12 +30,12 @@
       </div>
     </div>
 
-    <!-- Download buttons -->
-    <div class="flex flex-col sm:flex-row gap-3">
+    <!-- Primary Downloads -->
+    <div class="flex flex-col sm:flex-row gap-3 mb-4">
       <a
         :href="stlUrl"
         download
-        class="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 text-slate-900 font-semibold border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all"
+        class="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-xl shadow-lg shadow-primary-600/25 transition-all"
       >
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -44,22 +44,10 @@
       </a>
 
       <a
-        v-if="multicolorAvailable"
-        :href="multicolor3mfUrl"
-        download
-        class="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-green-500 via-blue-500 to-red-500 hover:from-green-600 hover:via-blue-600 hover:to-red-600 text-white font-semibold rounded-xl shadow-lg shadow-blue-500/25 transition-all"
-      >
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
-        </svg>
-        Multi-Color 3MF
-      </a>
-
-      <a
         v-if="slicerAvailable"
         :href="threemfUrl"
         download
-        class="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-gradient-to-r from-accent-500 to-accent-600 hover:from-accent-600 hover:to-accent-700 text-white font-semibold rounded-xl shadow-lg shadow-accent-500/25 transition-all"
+        class="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all"
       >
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -69,7 +57,7 @@
 
       <button
         @click="$emit('print')"
-        class="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-xl shadow-lg shadow-primary-600/25 transition-all"
+        class="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all"
       >
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -78,22 +66,71 @@
       </button>
     </div>
 
-    <div class="mt-4 text-xs text-slate-500 text-center space-y-1">
-      <p v-if="multicolorAvailable">
-        Multi-Color 3MF: parks (green), water (blue), roads (gray), buildings (red) - for AMS/multi-material printers
-      </p>
-      <p v-if="slicerAvailable">
-        Pre-Sliced 3MF: ironing for smooth tactile surfaces (0.3mm layers, 20% ironing)
-      </p>
+    <!-- Multi-Color Section (Collapsible) -->
+    <div class="border border-slate-200 rounded-xl overflow-hidden">
+      <button
+        @click="showMultiColor = !showMultiColor"
+        class="w-full flex items-center justify-between p-4 bg-slate-50 hover:bg-slate-100 transition-colors"
+      >
+        <div class="flex items-center gap-3">
+          <div class="flex -space-x-1">
+            <div class="w-4 h-4 rounded-full bg-red-500 border-2 border-white"></div>
+            <div class="w-4 h-4 rounded-full bg-gray-500 border-2 border-white"></div>
+            <div class="w-4 h-4 rounded-full bg-blue-500 border-2 border-white"></div>
+            <div class="w-4 h-4 rounded-full bg-green-500 border-2 border-white"></div>
+          </div>
+          <span class="font-medium text-slate-700">Multi-Color Printing (AMS)</span>
+        </div>
+        <svg
+          class="w-5 h-5 text-slate-400 transition-transform"
+          :class="{ 'rotate-180': showMultiColor }"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+        >
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      <div v-if="showMultiColor" class="p-4 space-y-4">
+        <p class="text-sm text-slate-600">
+          Download individual layers to import into Bambu Studio and assign to different filament slots.
+        </p>
+
+        <!-- Layer Downloads Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <a
+            v-for="layer in layers"
+            :key="layer.id"
+            :href="getLayerUrl(layer.id)"
+            download
+            class="flex items-center gap-2 px-3 py-2 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg text-sm font-medium transition-colors"
+          >
+            <div class="w-3 h-3 rounded-full" :style="{ backgroundColor: layer.color }"></div>
+            <span class="text-slate-700">{{ layer.name }}</span>
+          </a>
+        </div>
+
+        <!-- Download All as ZIP would be nice, but for now just show the tip -->
+        <div class="text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
+          <strong>Bambu Studio tip:</strong> Import each STL, right-click to assign filament, then print.
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
+import { getDownloadUrl } from '../../api.js'
+
 export default {
   name: 'GeneratorResults',
 
   props: {
+    jobId: {
+      type: String,
+      required: true
+    },
     fileInfo: {
       type: Object,
       default: null
@@ -106,15 +143,7 @@ export default {
       type: String,
       required: true
     },
-    multicolor3mfUrl: {
-      type: String,
-      required: true
-    },
     slicerAvailable: {
-      type: Boolean,
-      default: false
-    },
-    multicolorAvailable: {
       type: Boolean,
       default: false
     }
@@ -122,10 +151,27 @@ export default {
 
   emits: ['print'],
 
+  data() {
+    return {
+      showMultiColor: false,
+      layers: [
+        { id: 'buildings', name: 'Buildings', color: '#CC4444' },
+        { id: 'roads', name: 'Roads', color: '#808080' },
+        { id: 'water', name: 'Water', color: '#4488CC' },
+        { id: 'parks', name: 'Parks', color: '#44AA44' },
+        { id: 'base', name: 'Base', color: '#FFFFFF' },
+      ]
+    }
+  },
+
   methods: {
     formatNumber(num) {
       if (num === null || num === undefined) return '-'
       return num.toLocaleString()
+    },
+
+    getLayerUrl(layerId) {
+      return getDownloadUrl(this.jobId, `stl_${layerId}`)
     }
   }
 }
