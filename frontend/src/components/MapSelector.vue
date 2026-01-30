@@ -135,10 +135,8 @@ export default {
           this.map.doubleClickZoom.enable()
           this.map.scrollWheelZoom.enable()
         }
-        // Invalidate size after state change causes layout reflow
-        this.$nextTick(() => {
-          this.map.invalidateSize()
-        })
+        // Invalidate size multiple times to handle layout reflows
+        this.scheduleInvalidation()
       }
     },
   },
@@ -346,6 +344,28 @@ export default {
         },
         { timeout: 5000 }
       )
+    },
+
+    // Schedule multiple invalidations to handle CSS transitions and layout reflows
+    scheduleInvalidation() {
+      if (!this.map) return
+
+      // Immediate
+      this.map.invalidateSize()
+
+      // After Vue's nextTick
+      this.$nextTick(() => {
+        if (this.map) this.map.invalidateSize()
+      })
+
+      // After CSS transitions (typically 150-300ms)
+      setTimeout(() => {
+        if (this.map) this.map.invalidateSize()
+      }, 100)
+
+      setTimeout(() => {
+        if (this.map) this.map.invalidateSize()
+      }, 300)
     },
   },
 }
