@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+@theme {
+  /* Bold Primary - Vibrant Blue */
+  --color-primary-50: oklch(0.97 0.02 250);
+  --color-primary-100: oklch(0.93 0.05 250);
+  --color-primary-200: oklch(0.87 0.08 250);
+  --color-primary-300: oklch(0.78 0.12 250);
+  --color-primary-400: oklch(0.68 0.16 250);
+  --color-primary-500: oklch(0.58 0.19 250);
+  --color-primary-600: oklch(0.50 0.18 250);
+  --color-primary-700: oklch(0.42 0.15 250);
+
+  /* Accent - Vibrant Coral/Orange */
+  --color-accent-400: oklch(0.75 0.18 30);
+  --color-accent-500: oklch(0.68 0.20 30);
+  --color-accent-600: oklch(0.60 0.18 30);
+
+  /* Success - Vibrant Green */
+  --color-success-500: oklch(0.65 0.18 145);
+  --color-success-600: oklch(0.55 0.16 145);
+
+  /* Warning - Amber */
+  --color-warning-500: oklch(0.80 0.15 85);
+
+  /* Danger - Red */
+  --color-danger-500: oklch(0.60 0.20 25);
+  --color-danger-600: oklch(0.52 0.18 25);
+
+  /* Typography */
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Leaflet CSS protection - prevent Tailwind reset from breaking map controls */
+.leaflet-container button {
+  all: revert;
+}
+
+.leaflet-container a {
+  all: revert;
+}
+
+/* Ensure Leaflet controls maintain their styling */
+.leaflet-control-zoom a,
+.leaflet-control-attribution a {
+  all: revert;
+}
