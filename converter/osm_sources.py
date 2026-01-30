@@ -19,38 +19,115 @@ OVERPASS_ENDPOINTS = [
     "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
 ]
 
+# Default layer configuration
+DEFAULT_LAYERS = {
+    "buildings": True,
+    "roads": True,
+    "water": True,
+    "rivers": False,
+    "parks": False,
+    "trails": False,
+    "terrain": False,
+}
 
-def fetch_osm_data(bbox: tuple, timeout: int = 180) -> str:
+
+def build_overpass_query(bbox: tuple, layers: dict, timeout: int = 180) -> str:
+    """
+    Build Overpass query based on selected layers.
+
+    Args:
+        bbox: Tuple of (lat_min, lon_min, lat_max, lon_max)
+        layers: Dictionary of layer_id -> enabled (bool)
+        timeout: Query timeout in seconds
+
+    Returns:
+        Overpass QL query string
+    """
+    lat_min, lon_min, lat_max, lon_max = bbox
+
+    queries = []
+
+    if layers.get("buildings", True):
+        queries.extend([
+            'way["building"]',
+            'relation["building"]',
+        ])
+
+    if layers.get("roads", True):
+        queries.extend([
+            'way["highway"]',
+            'way["railway"]',
+        ])
+
+    if layers.get("water", True):
+        queries.extend([
+            'way["natural"="water"]',
+            'relation["natural"="water"]',
+            'way["landuse"="grass"]',
+        ])
+
+    if layers.get("rivers", False):
+        queries.extend([
+            'way["waterway"~"river|stream|canal|ditch"]',
+            'relation["waterway"]',
+        ])
+
+    if layers.get("parks", False):
+        queries.extend([
+            'way["leisure"="park"]',
+            'way["landuse"="forest"]',
+            'way["landuse"="recreation_ground"]',
+            'way["boundary"="protected_area"]',
+            'relation["leisure"="park"]',
+            'relation["landuse"="forest"]',
+        ])
+
+    if layers.get("trails", False):
+        queries.extend([
+            'way["highway"="path"]',
+            'way["highway"="footway"]',
+            'way["highway"="track"]',
+            'way["highway"="bridleway"]',
+            'way["highway"="cycleway"]',
+        ])
+
+    # If no layers selected, at least get basic features
+    if not queries:
+        queries = ['way["highway"]']
+
+    query_str = ";\n      ".join(queries)
+
+    return f"""
+    [out:xml][timeout:{timeout}][bbox:{lat_min},{lon_min},{lat_max},{lon_max}];
+    (
+      {query_str};
+    );
+    out meta;
+    >;
+    out meta qt;
+    """
+
+
+def fetch_osm_data(bbox: tuple, timeout: int = 180, layers: dict = None) -> str:
     """
     Fetch OSM data via Overpass API.
 
     Args:
         bbox: Tuple of (lat_min, lon_min, lat_max, lon_max)
         timeout: Request timeout in seconds
+        layers: Dictionary of layer_id -> enabled (bool)
 
     Returns:
         OSM XML data as string
     """
     lat_min, lon_min, lat_max, lon_max = bbox
 
-    # Overpass uses (south, west, north, east) = (lat_min, lon_min, lat_max, lon_max)
-    # Use 'out meta' to include version/changeset attributes that OSM2World requires
-    query = f"""
-    [out:xml][timeout:{timeout}][bbox:{lat_min},{lon_min},{lat_max},{lon_max}];
-    (
-      way["building"];
-      way["highway"];
-      way["railway"];
-      way["waterway"];
-      way["natural"="water"];
-      way["landuse"="grass"];
-      relation["building"];
-      relation["natural"="water"];
-    );
-    out meta;
-    >;
-    out meta qt;
-    """
+    # Use provided layers or defaults
+    if layers is None:
+        layers = DEFAULT_LAYERS
+
+    # Build query based on selected layers
+    query = build_overpass_query(bbox, layers, timeout)
 
     last_error = None
     for endpoint in OVERPASS_ENDPOINTS:
@@ -321,7 +398,8 @@ def get_map_data(
     diameter_meters: int,
     data_source: str = "osm",
     work_dir: str = "/tmp",
-    timeout: int = 180
+    timeout: int = 180,
+    layers: dict = None
 ) -> str:
     """
     Get map data for a location.
@@ -333,14 +411,19 @@ def get_map_data(
         data_source: "osm" or "overture" (with Overture Maps buildings)
         work_dir: Working directory for temporary files
         timeout: Request timeout
+        layers: Dictionary of layer_id -> enabled (bool)
 
     Returns:
         OSM XML data
     """
     bbox = calculate_bbox(lat, lon, diameter_meters)
 
+    # Use provided layers or defaults
+    if layers is None:
+        layers = DEFAULT_LAYERS
+
     try:
-        osm_data = fetch_osm_data(bbox, timeout)
+        osm_data = fetch_osm_data(bbox, timeout, layers)
     except Exception as e:
         print(f"Overpass API failed: {e}, trying XAPI...")
         osm_data = fetch_osm_xapi(bbox, timeout)

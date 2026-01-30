@@ -9,7 +9,7 @@ import shutil
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
@@ -69,6 +69,17 @@ def get_redis() -> redis.Redis:
 # Request/Response Models
 # ============================================
 
+class LayerConfig(BaseModel):
+    """Configuration for which map layers to include."""
+    buildings: bool = True
+    roads: bool = True
+    water: bool = True
+    rivers: bool = False
+    parks: bool = False
+    trails: bool = False
+    terrain: bool = False
+
+
 class MapRequest(BaseModel):
     """Request to generate a tactile map."""
     address: Optional[str] = Field(None, description="Address to geocode")
@@ -78,6 +89,7 @@ class MapRequest(BaseModel):
     size_cm: float = Field(23.0, ge=5, le=50, description="Print size in centimeters")
     include_buildings: bool = Field(True, description="Whether to include buildings")
     data_source: str = Field("osm", description="Data source: 'osm' or 'overture' (osm_ms accepted for backwards compatibility)")
+    layers: Optional[LayerConfig] = Field(default_factory=LayerConfig, description="Map layers to include")
 
 
 class MapResponse(BaseModel):
@@ -186,6 +198,9 @@ async def create_map(request: MapRequest):
         # Fallback to coordinates
         location_name = f"{lat:.3f}_{lon:.3f}"
 
+    # Get layers config (use defaults if not provided)
+    layers = request.layers or LayerConfig()
+
     # Create job payload
     job = {
         "id": job_id,
@@ -195,6 +210,7 @@ async def create_map(request: MapRequest):
         "size_cm": request.size_cm,
         "include_buildings": request.include_buildings,
         "data_source": request.data_source,
+        "layers": layers.model_dump(),
         "location_name": location_name,
         "created_at": datetime.utcnow().isoformat(),
     }
