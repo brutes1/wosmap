@@ -21,11 +21,14 @@
     </div>
 
     <!-- Map Container -->
-    <div
-      ref="mapContainer"
-      class="flex-1 min-h-0"
-      :class="{ 'opacity-70 pointer-events-none': disabled }"
-    ></div>
+    <div ref="mapWrapper" class="flex-1 min-h-0 relative">
+      <div ref="mapContainer" class="absolute inset-0"></div>
+      <!-- Disabled overlay - using overlay instead of opacity to avoid Leaflet rendering issues -->
+      <div
+        v-if="disabled"
+        class="absolute inset-0 bg-white/30 pointer-events-none z-[1000]"
+      ></div>
+    </div>
 
     <!-- Coordinates Display -->
     <div class="flex justify-between items-center px-3 sm:px-4 py-2.5 bg-slate-50 border-t border-slate-100 text-sm">
