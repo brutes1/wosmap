@@ -16,12 +16,16 @@
 
       <!-- Settings and Generate Button -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div class="lg:col-span-2">
+        <div class="lg:col-span-2 space-y-6">
           <PrintSettings
             v-model:scale="scale"
             v-model:size-cm="sizeCm"
             v-model:include-buildings="includeBuildings"
             v-model:data-source="dataSource"
+            :disabled="isProcessing"
+          />
+          <LayerSettings
+            v-model="layers"
             :disabled="isProcessing"
           />
         </div>
@@ -79,6 +83,7 @@ import AppHeader from './components/layout/AppHeader.vue'
 import AppFooter from './components/layout/AppFooter.vue'
 import LocationSection from './components/location/LocationSection.vue'
 import PrintSettings from './components/settings/PrintSettings.vue'
+import LayerSettings from './components/settings/LayerSettings.vue'
 import GenerateButton from './components/generator/GenerateButton.vue'
 import GeneratorProgress from './components/generator/GeneratorProgress.vue'
 import GeneratorResults from './components/generator/GeneratorResults.vue'
@@ -93,6 +98,7 @@ export default {
     AppFooter,
     LocationSection,
     PrintSettings,
+    LayerSettings,
     GenerateButton,
     GeneratorProgress,
     GeneratorResults,
@@ -111,6 +117,17 @@ export default {
       sizeCm: 23,
       includeBuildings: true,
       dataSource: 'overture',
+
+      // Map layers
+      layers: {
+        buildings: true,
+        roads: true,
+        water: true,
+        rivers: false,
+        parks: false,
+        trails: false,
+        terrain: false,
+      },
 
       // Status
       status: null,
@@ -182,7 +199,8 @@ export default {
           scale: this.scale,
           size_cm: this.sizeCm,
           include_buildings: this.includeBuildings,
-          data_source: this.dataSource
+          data_source: this.dataSource,
+          layers: this.layers
         }
 
         const response = await createMap(params)
