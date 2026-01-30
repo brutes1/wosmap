@@ -231,9 +231,10 @@ def export_svg(base_path, args):
     dwg.save()
     print("creating SVG took " + (str(time.perf_counter() - t)))
 
-def _export_stl(stl_path, scale):
+def _export_stl(stl_path, scale, use_selection=True):
     print("creating {stl}...".format(stl=stl_path))
     bpy.ops.export_mesh.stl(filepath=stl_path, check_existing=False, \
+                            use_selection=use_selection, \
                             axis_forward='Y', axis_up='Z', global_scale=(1000 / scale))
 
 def export_stl(base_path, scale):
