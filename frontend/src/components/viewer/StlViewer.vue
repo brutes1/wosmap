@@ -320,7 +320,13 @@ export default {
 
     // Watch for URL changes
     watch(() => props.stlUrl, (newUrl) => {
-      if (newUrl) loadSTL(newUrl)
+      if (newUrl) {
+        // If scene doesn't exist yet (component reused), reinitialize
+        if (!scene.value && containerRef.value) {
+          init()
+        }
+        loadSTL(newUrl)
+      }
     }, { immediate: false })
 
     // Watch for container resize

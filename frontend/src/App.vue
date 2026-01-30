@@ -45,6 +45,7 @@
             :jobs="history"
             :slicer-available="slicerAvailable"
             @clear="clearAllHistory"
+            @preview="previewHistoryJob"
           />
         </div>
       </aside>
@@ -54,7 +55,7 @@
         <!-- 3D Viewer -->
         <div class="flex-1 relative min-h-[300px] md:min-h-0">
           <StlViewer
-            v-if="completed && downloadUrl"
+            v-if="hasPreview && downloadUrl"
             :stl-url="downloadUrl"
             @load="onModelLoaded"
             @error="onModelError"
@@ -64,9 +65,9 @@
 
         <!-- Download Bar (when complete) -->
         <GeneratorResults
-          v-if="completed"
+          v-if="hasPreview"
           class="border-t border-slate-200"
-          :file-info="fileInfo"
+          :file-info="activeFileInfo"
           :stl-url="downloadUrl"
           :threemf-url="download3mfUrl"
           :slicer-available="slicerAvailable"
@@ -151,6 +152,10 @@ export default {
       // History
       history: [],
 
+      // Preview (for viewing history jobs)
+      previewJobId: null,
+      previewFileInfo: null,
+
       // Capabilities
       slicerAvailable: false
     }
@@ -168,14 +173,27 @@ export default {
       return this.latitude !== null && this.longitude !== null
     },
 
+    // Use preview job if set, otherwise use current job
+    activeJobId() {
+      return this.previewJobId || this.jobId
+    },
+
+    activeFileInfo() {
+      return this.previewFileInfo || this.fileInfo
+    },
+
+    hasPreview() {
+      return this.completed || this.previewJobId
+    },
+
     downloadUrl() {
-      if (!this.jobId) return null
-      return getDownloadUrl(this.jobId, 'stl')
+      if (!this.activeJobId) return null
+      return getDownloadUrl(this.activeJobId, 'stl')
     },
 
     download3mfUrl() {
-      if (!this.jobId) return null
-      return getDownloadUrl(this.jobId, '3mf')
+      if (!this.activeJobId) return null
+      return getDownloadUrl(this.activeJobId, '3mf')
     }
   },
 
@@ -188,6 +206,10 @@ export default {
       this.currentStage = 'queued'
       this.stageMessage = null
       this.fileInfo = null
+
+      // Clear any history preview
+      this.previewJobId = null
+      this.previewFileInfo = null
 
       try {
         const params = {
@@ -268,6 +290,17 @@ export default {
 
     onModelError(err) {
       console.error('Failed to load 3D model:', err)
+    },
+
+    previewHistoryJob(job) {
+      // Clear current job state to show history preview
+      this.completed = false
+      this.jobId = null
+      this.fileInfo = null
+
+      // Set preview state
+      this.previewJobId = job.job_id
+      this.previewFileInfo = job.file_info
     }
   }
 }
