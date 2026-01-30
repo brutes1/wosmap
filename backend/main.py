@@ -7,6 +7,7 @@ import os
 import json
 import shutil
 import uuid
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict
@@ -448,6 +449,90 @@ async def download_map(job_id: str, file_type: str = "stl"):
         path=file_path,
         filename=filename,
         media_type=content_type
+    )
+
+
+@app.get("/api/maps/{job_id}/download-all")
+async def download_all_files(job_id: str):
+    """
+    Download all generated files as a ZIP archive.
+
+    Includes:
+    - Combined STL
+    - Individual layer STLs (buildings, roads, trails, water, parks, base)
+    - SVG preview
+    - 3MF (if slicer available)
+    """
+    r = get_redis()
+    result = r.get(f"result:{job_id}")
+
+    if result is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    data = json.loads(result)
+
+    if data.get("status") != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job is not completed. Current status: {data.get('status')}"
+        )
+
+    files = data.get("files", {})
+    feature_stls = files.get("feature_stls", {})
+
+    # Get location name and date for filenames
+    location_name = data.get("location_name", "map")
+    created_at = data.get("created_at", "")
+    if created_at:
+        date_str = created_at.split("T")[0]
+    else:
+        date_str = datetime.utcnow().strftime("%Y-%m-%d")
+
+    # Create ZIP file
+    stl_path = files.get("stl")
+    if stl_path is None:
+        raise HTTPException(status_code=404, detail="STL file not found")
+
+    job_dir = Path(stl_path).parent
+    zip_path = job_dir / f"wosmap_{location_name}_{date_str}.zip"
+
+    # Build the ZIP if it doesn't exist or regenerate
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        # Add combined STL
+        if stl_path and Path(stl_path).exists():
+            zf.write(stl_path, f"wosmap_{location_name}_combined.stl")
+
+        # Add individual layer STLs
+        for layer_name, layer_path in feature_stls.items():
+            if Path(layer_path).exists():
+                zf.write(layer_path, f"wosmap_{location_name}_{layer_name}.stl")
+
+        # Add SVG if available
+        svg_path = files.get("svg")
+        if svg_path and Path(svg_path).exists():
+            zf.write(svg_path, f"wosmap_{location_name}.svg")
+
+        # Add pre-sliced 3MF if available
+        threemf_path = Path(stl_path).with_suffix(".3mf")
+        if threemf_path.exists():
+            zf.write(threemf_path, f"wosmap_{location_name}_presliced.3mf")
+
+        # Add multi-color 3MF if it exists
+        multicolor_path = Path(stl_path).with_suffix(".multicolor.3mf")
+        if multicolor_path.exists():
+            zf.write(multicolor_path, f"wosmap_{location_name}_multicolor.3mf")
+
+    # Security: Validate file is within MAPS_DIR
+    try:
+        if not zip_path.resolve().is_relative_to(MAPS_DIR.resolve()):
+            raise HTTPException(status_code=403, detail="Access denied")
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return FileResponse(
+        path=zip_path,
+        filename=f"wosmap_{location_name}_{date_str}.zip",
+        media_type="application/zip"
     )
 
 

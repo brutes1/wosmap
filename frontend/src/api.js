@@ -46,6 +46,13 @@ export function getDownloadUrl(jobId, fileType = 'stl') {
 }
 
 /**
+ * Get the download URL for a ZIP archive of all files.
+ */
+export function getDownloadAllUrl(jobId) {
+  return `${API_BASE}/maps/${jobId}/download-all`
+}
+
+/**
  * Get server capabilities (slicer, multicolor support, etc).
  */
 export async function getCapabilities() {

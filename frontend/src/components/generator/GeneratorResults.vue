@@ -30,29 +30,17 @@
       </div>
     </div>
 
-    <!-- Primary Downloads -->
+    <!-- Primary Download - ZIP with all files -->
     <div class="flex flex-col sm:flex-row gap-3 mb-4">
       <a
-        :href="stlUrl"
+        :href="downloadAllUrl"
         download
         class="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-primary-600 hover:bg-primary-700 text-white font-semibold rounded-xl shadow-lg shadow-primary-600/25 transition-all"
       >
         <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
         </svg>
-        Download STL
-      </a>
-
-      <a
-        v-if="slicerAvailable"
-        :href="threemfUrl"
-        download
-        class="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-white hover:bg-slate-50 text-slate-700 font-semibold border border-slate-200 rounded-xl shadow-sm hover:shadow-md transition-all"
-      >
-        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-        </svg>
-        Pre-Sliced 3MF
+        Download All (ZIP)
       </a>
 
       <button
@@ -94,7 +82,7 @@
 
       <div v-if="showMultiColor" class="p-4 space-y-4">
         <p class="text-sm text-slate-600">
-          Download individual layers to import into Bambu Studio and assign to different filament slots.
+          The ZIP includes all layers. Download individual layers here if needed.
         </p>
 
         <!-- Layer Downloads Grid -->
@@ -127,7 +115,7 @@
 </template>
 
 <script>
-import { getDownloadUrl } from '../../api.js'
+import { getDownloadUrl, getDownloadAllUrl } from '../../api.js'
 
 export default {
   name: 'GeneratorResults',
@@ -168,6 +156,12 @@ export default {
         { id: 'parks', name: 'Parks', color: '#44AA44' },
         { id: 'base', name: 'Base', color: '#FFFFFF' },
       ]
+    }
+  },
+
+  computed: {
+    downloadAllUrl() {
+      return getDownloadAllUrl(this.jobId)
     }
   },
 
