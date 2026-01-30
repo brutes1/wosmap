@@ -95,6 +95,7 @@ export default {
       rectangle: null,
       searchQuery: '',
       isSearching: false,
+      resizeObserver: null,
     }
   },
 
@@ -134,15 +135,30 @@ export default {
           this.map.doubleClickZoom.enable()
           this.map.scrollWheelZoom.enable()
         }
+        // Invalidate size after state change causes layout reflow
+        this.$nextTick(() => {
+          this.map.invalidateSize()
+        })
       }
     },
   },
 
   mounted() {
     this.initMap()
+
+    // Watch for container resize and invalidate map
+    this.resizeObserver = new ResizeObserver(() => {
+      if (this.map) {
+        this.map.invalidateSize()
+      }
+    })
+    this.resizeObserver.observe(this.$refs.mapContainer)
   },
 
   beforeUnmount() {
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect()
+    }
     if (this.map) {
       this.map.remove()
     }
