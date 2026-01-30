@@ -413,7 +413,7 @@ async def download_map(job_id: str, file_type: str = "stl"):
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found on disk")
 
-    # Determine content type
+    # Determine content type and file extension
     content_types = {
         "stl": "application/sla",
         "svg": "image/svg+xml",
@@ -432,12 +432,22 @@ async def download_map(job_id: str, file_type: str = "stl"):
     else:
         date_str = datetime.utcnow().strftime("%Y-%m-%d")
 
-    filename = f"wosmap_{location_name}_{date_str}.{file_type}"
+    # Handle layer STL files (stl_buildings, stl_roads, etc.)
+    if file_type.startswith("stl_"):
+        layer_name = file_type[4:]  # Remove "stl_" prefix
+        filename = f"wosmap_{location_name}_{date_str}_{layer_name}.stl"
+        content_type = "application/sla"
+    elif file_type == "multicolor-3mf":
+        filename = f"wosmap_{location_name}_{date_str}_multicolor.3mf"
+        content_type = content_types.get(file_type, "application/octet-stream")
+    else:
+        filename = f"wosmap_{location_name}_{date_str}.{file_type}"
+        content_type = content_types.get(file_type, "application/octet-stream")
 
     return FileResponse(
         path=file_path,
         filename=filename,
-        media_type=content_types.get(file_type, "application/octet-stream")
+        media_type=content_type
     )
 
 
