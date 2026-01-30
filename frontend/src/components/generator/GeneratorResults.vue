@@ -111,9 +111,15 @@
           </a>
         </div>
 
-        <!-- Download All as ZIP would be nice, but for now just show the tip -->
-        <div class="text-xs text-slate-500 bg-slate-50 rounded-lg p-3">
-          <strong>Bambu Studio tip:</strong> Import each STL, right-click to assign filament, then print.
+        <!-- Bambu Studio instructions -->
+        <div class="text-xs text-slate-600 bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-1">
+          <p class="font-semibold text-amber-800">Bambu Studio import:</p>
+          <ol class="list-decimal list-inside space-y-0.5 text-slate-600">
+            <li>Import first STL (Base recommended)</li>
+            <li>Right-click object → <strong>Add Part</strong> → select next STL</li>
+            <li>Repeat for each layer (keeps alignment)</li>
+            <li>Select each part → assign to filament slot</li>
+          </ol>
         </div>
       </div>
     </div>
