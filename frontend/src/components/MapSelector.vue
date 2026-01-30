@@ -1,19 +1,20 @@
 <template>
-  <div class="map-selector">
+  <div class="w-full h-full flex flex-col">
     <!-- Address Search -->
-    <div class="search-bar">
+    <div class="flex gap-2 p-3 sm:p-4 bg-slate-50 border-b border-slate-100">
       <input
         type="text"
         v-model="searchQuery"
         @keyup.enter="searchAddress"
         placeholder="Search for an address..."
         :disabled="disabled || isSearching"
+        class="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       />
       <button
         type="button"
         @click="searchAddress"
         :disabled="disabled || isSearching || !searchQuery.trim()"
-        class="search-btn"
+        class="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl text-sm shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600 whitespace-nowrap"
       >
         {{ isSearching ? '...' : 'Search' }}
       </button>
@@ -22,22 +23,24 @@
     <!-- Map Container -->
     <div
       ref="mapContainer"
-      class="map-container"
-      :class="{ disabled: disabled }"
+      class="flex-1 min-h-0"
+      :class="{ 'opacity-70 pointer-events-none': disabled }"
     ></div>
 
     <!-- Coordinates Display -->
-    <div class="coordinates-bar">
-      <span v-if="hasMarker" class="coords">
-        Center: {{ latitude?.toFixed(5) }}, {{ longitude?.toFixed(5) }}
+    <div class="flex justify-between items-center px-3 sm:px-4 py-2.5 bg-slate-50 border-t border-slate-100 text-sm">
+      <span v-if="hasMarker" class="text-slate-700 font-mono">
+        {{ latitude?.toFixed(5) }}, {{ longitude?.toFixed(5) }}
       </span>
-      <span v-else class="hint">Click on the map to select center point</span>
+      <span v-else class="text-slate-400 italic">
+        Click on the map to select a point
+      </span>
       <button
         v-if="hasMarker"
         type="button"
         @click="resetMarker"
         :disabled="disabled"
-        class="reset-btn"
+        class="px-3 py-1 text-xs font-medium text-danger-600 hover:text-danger-700 hover:bg-danger-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Reset
       </button>
@@ -89,7 +92,7 @@ export default {
     return {
       map: null,
       marker: null,
-      rectangle: null,  // Coverage area overlay (square)
+      rectangle: null,
       searchQuery: '',
       isSearching: false,
     }
@@ -100,22 +103,17 @@ export default {
       return this.latitude !== null && this.longitude !== null
     },
 
-    // Coverage half-side in meters (the map is square)
     coverageHalfSide() {
-      // sizeCm * scale / 100 converts cm at scale to meters
-      // This gives the full side length, divide by 2 for half
       const sideMeters = (this.sizeCm * this.scale) / 100
       return sideMeters / 2
     },
   },
 
   watch: {
-    // Update rectangle when scale or size changes
     coverageHalfSide() {
       this.updateRectangle()
     },
 
-    // Update marker when coords change externally
     latitude() {
       this.syncMarkerFromProps()
     },
@@ -123,7 +121,6 @@ export default {
       this.syncMarkerFromProps()
     },
 
-    // Disable map interactions when disabled
     disabled(newVal) {
       if (this.map) {
         if (newVal) {
@@ -153,8 +150,7 @@ export default {
 
   methods: {
     initMap() {
-      // Default center (world view, or use existing coords if set)
-      let center = [40, -95]  // Roughly center of US
+      let center = [40, -95]
       let zoom = 4
 
       if (this.hasMarker) {
@@ -162,28 +158,23 @@ export default {
         zoom = 14
       }
 
-      // Create map
       this.map = L.map(this.$refs.mapContainer, {
         center,
         zoom,
         zoomControl: true,
       })
 
-      // Add OpenStreetMap tiles
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
       }).addTo(this.map)
 
-      // Handle click to set marker
       this.map.on('click', this.onMapClick)
 
-      // If we already have coords, set up the marker
       if (this.hasMarker) {
         this.setMarker(this.latitude, this.longitude)
       }
 
-      // Try geolocation on first load if no coords set
       if (!this.hasMarker) {
         this.tryGeolocation()
       }
@@ -199,16 +190,13 @@ export default {
     },
 
     setMarker(lat, lng) {
-      // Remove existing marker
       if (this.marker) {
         this.map.removeLayer(this.marker)
       }
 
-      // Create new draggable marker
       this.marker = L.marker([lat, lng], { draggable: !this.disabled })
         .addTo(this.map)
 
-      // Handle marker drag
       this.marker.on('dragend', (e) => {
         const pos = e.target.getLatLng()
         this.$emit('update:latitude', pos.lat)
@@ -216,16 +204,13 @@ export default {
         this.updateRectangle()
       })
 
-      // Update rectangle
       this.updateRectangle()
     },
 
-    // Convert meters to latitude degrees (constant everywhere on Earth)
     metersToLatDegrees(meters) {
-      return meters / 111320  // 1 degree lat ≈ 111.32 km
+      return meters / 111320
     },
 
-    // Convert meters to longitude degrees (varies by latitude)
     metersToLngDegrees(meters, lat) {
       return meters / (111320 * Math.cos(lat * Math.PI / 180))
     },
@@ -233,25 +218,23 @@ export default {
     updateRectangle() {
       if (!this.hasMarker || !this.map) return
 
-      // Remove existing rectangle
       if (this.rectangle) {
         this.map.removeLayer(this.rectangle)
       }
 
-      // Calculate bounds for a square centered on the marker
       const halfSide = this.coverageHalfSide
       const latOffset = this.metersToLatDegrees(halfSide)
       const lngOffset = this.metersToLngDegrees(halfSide, this.latitude)
 
       const bounds = [
-        [this.latitude - latOffset, this.longitude - lngOffset],  // SW corner
-        [this.latitude + latOffset, this.longitude + lngOffset]   // NE corner
+        [this.latitude - latOffset, this.longitude - lngOffset],
+        [this.latitude + latOffset, this.longitude + lngOffset]
       ]
 
-      // Create new rectangle showing coverage area (matches printed map shape)
+      // Use a vibrant primary color for the rectangle
       this.rectangle = L.rectangle(bounds, {
-        color: '#4a90d9',
-        fillColor: '#4a90d9',
+        color: '#3b82f6',
+        fillColor: '#3b82f6',
         fillOpacity: 0.15,
         weight: 2,
       }).addTo(this.map)
@@ -295,7 +278,6 @@ export default {
 
       this.isSearching = true
       try {
-        // Use Nominatim for geocoding (same as backend)
         const query = encodeURIComponent(this.searchQuery)
         const response = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`,
@@ -312,12 +294,10 @@ export default {
           const latitude = parseFloat(lat)
           const longitude = parseFloat(lon)
 
-          // Set marker and emit
           this.setMarker(latitude, longitude)
           this.$emit('update:latitude', latitude)
           this.$emit('update:longitude', longitude)
 
-          // Pan to location
           this.map.setView([latitude, longitude], 15)
         } else {
           alert('Address not found. Try a different search.')
@@ -336,7 +316,6 @@ export default {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords
-          // Just center the map, don't set marker (user should click to confirm)
           this.map.setView([latitude, longitude], 14)
         },
         () => {
@@ -348,98 +327,3 @@ export default {
   },
 }
 </script>
-
-<style scoped>
-.map-selector {
-  width: 100%;
-}
-
-.search-bar {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.search-bar input {
-  flex: 1;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-}
-
-.search-bar input:focus {
-  outline: none;
-  border-color: #4a90d9;
-}
-
-.search-btn {
-  padding: 10px 16px;
-  background: #4a90d9;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  font-size: 14px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.search-btn:hover:not(:disabled) {
-  background: #3a7bc8;
-}
-
-.search-btn:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-.map-container {
-  height: 300px;
-  border-radius: 6px;
-  border: 1px solid #ddd;
-  overflow: hidden;
-}
-
-.map-container.disabled {
-  opacity: 0.7;
-  pointer-events: none;
-}
-
-.coordinates-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 8px;
-  font-size: 13px;
-}
-
-.coords {
-  color: #333;
-  font-family: monospace;
-}
-
-.hint {
-  color: #888;
-  font-style: italic;
-}
-
-.reset-btn {
-  padding: 4px 12px;
-  background: transparent;
-  color: #666;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.reset-btn:hover:not(:disabled) {
-  background: #f5f5f5;
-  border-color: #999;
-}
-
-.reset-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-</style>
