@@ -1,20 +1,20 @@
 <template>
   <div class="w-full h-full flex flex-col">
     <!-- Address Search -->
-    <div class="flex gap-2 p-3 sm:p-4 bg-slate-50 border-b border-slate-100">
+    <div class="flex gap-2 p-3 sm:p-4 bg-navy-950/60 border-b border-white/[0.06]">
       <input
         type="text"
         v-model="searchQuery"
         @keyup.enter="searchAddress"
         placeholder="Search for an address..."
         :disabled="disabled || isSearching"
-        class="flex-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+        class="flex-1 px-4 py-2.5 bg-surface-2 border border-white/[0.08] rounded-xl text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
       />
       <button
         type="button"
         @click="searchAddress"
         :disabled="disabled || isSearching || !searchQuery.trim()"
-        class="px-4 py-2.5 bg-primary-600 hover:bg-primary-700 text-white font-medium rounded-xl text-sm shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600 whitespace-nowrap"
+        class="px-4 py-2.5 bg-primary-600 hover:bg-primary-500 text-navy-950 font-medium rounded-xl text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600 whitespace-nowrap"
       >
         {{ isSearching ? '...' : 'Search' }}
       </button>
@@ -28,11 +28,11 @@
     ></div>
 
     <!-- Coordinates Display -->
-    <div class="flex justify-between items-center px-3 sm:px-4 py-2.5 bg-slate-50 border-t border-slate-100 text-sm">
-      <span v-if="hasMarker" class="text-slate-700 font-mono">
+    <div class="flex justify-between items-center px-3 sm:px-4 py-2.5 bg-navy-950/60 border-t border-white/[0.06] text-sm">
+      <span v-if="hasMarker" class="text-white/60 font-mono text-xs">
         {{ latitude?.toFixed(5) }}, {{ longitude?.toFixed(5) }}
       </span>
-      <span v-else class="text-slate-400 italic">
+      <span v-else class="text-white/25 italic text-xs">
         Click on the map to select a point
       </span>
       <button
@@ -40,7 +40,7 @@
         type="button"
         @click="resetMarker"
         :disabled="disabled"
-        class="px-3 py-1 text-xs font-medium text-danger-600 hover:text-danger-700 hover:bg-danger-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        class="px-3 py-1 text-xs font-medium text-danger-400 hover:text-danger-500 hover:bg-danger-500/10 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         Reset
       </button>
@@ -231,10 +231,9 @@ export default {
         [this.latitude + latOffset, this.longitude + lngOffset]
       ]
 
-      // Use a vibrant primary color for the rectangle
       this.rectangle = L.rectangle(bounds, {
-        color: '#3b82f6',
-        fillColor: '#3b82f6',
+        color: '#d4a053',
+        fillColor: '#d4a053',
         fillOpacity: 0.15,
         weight: 2,
       }).addTo(this.map)

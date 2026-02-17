@@ -99,13 +99,21 @@ public class ObjTarget extends FaceTarget<RenderableToObj> {
 			OSMElement osmElement;
 			if (element instanceof MapNode) {
 				osmElement = ((MapNode) element).getOsmNode();
-				
+
 				List<MapWaySegment> connectedWaySegments = ((MapNode) element).getConnectedWaySegments();
+				int trails = 0;
 				int pedestrians = 0;
 				for (MapWaySegment mapWaySegment : connectedWaySegments) {
-					pedestrians += isPath(mapWaySegment.getTags()) ? 1 : 0;
+					if (isTrail(mapWaySegment.getTags())) {
+						trails++;
+					} else if (isPath(mapWaySegment.getTags())) {
+						pedestrians++;
+					}
 				}
-				if (pedestrians >= (connectedWaySegments.size()+1) / 2) {
+				// Prioritize trail suffix if majority are trails
+				if (trails >= (connectedWaySegments.size()+1) / 2) {
+					roadSuffix = "::trail";
+				} else if (pedestrians >= (connectedWaySegments.size()+1) / 2) {
 					roadSuffix = "::pedestrian";
 				}
 			} else if (element instanceof MapWaySegment) {
@@ -117,7 +125,13 @@ public class ObjTarget extends FaceTarget<RenderableToObj> {
 			}
 			
 			if (roadSuffix == null) {
-				roadSuffix = isPath(osmElement.tags) ? "::pedestrian" : "";
+				if (isTrail(osmElement.tags)) {
+					roadSuffix = "::trail";
+				} else if (isPath(osmElement.tags)) {
+					roadSuffix = "::pedestrian";
+				} else {
+					roadSuffix = "";
+				}
 			}
 			
 			if (osmElement != null && osmElement.tags.containsKey("name")) {
@@ -132,6 +146,19 @@ public class ObjTarget extends FaceTarget<RenderableToObj> {
 		
 	}
 	
+	/**
+	 * Returns true for trail-type paths that should be exported separately
+	 * (hiking paths, bike trails, horse paths, etc.)
+	 */
+	private static boolean isTrail(TagGroup tags) {
+		String highwayValue = tags.getValue("highway");
+		return "path".equals(highwayValue)
+			|| "footway".equals(highwayValue)
+			|| "cycleway".equals(highwayValue)
+			|| "bridleway".equals(highwayValue)
+			|| "track".equals(highwayValue);
+	}
+
 	private static boolean isPath(TagGroup tags) {
 		String highwayValue = tags.getValue("highway");
 		if ("path".equals(highwayValue)

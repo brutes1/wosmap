@@ -46,6 +46,24 @@ export function getDownloadUrl(jobId, fileType = 'stl') {
 }
 
 /**
+ * Get the download URL for a ZIP archive of all files.
+ */
+export function getDownloadAllUrl(jobId) {
+  return `${API_BASE}/maps/${jobId}/download-all`
+}
+
+/**
+ * Get server capabilities (slicer, multicolor support, etc).
+ */
+export async function getCapabilities() {
+  const response = await fetch(`${API_BASE}/capabilities`)
+  if (!response.ok) {
+    throw new Error('Failed to get capabilities')
+  }
+  return response.json()
+}
+
+/**
  * Get history of all map generation jobs.
  */
 export async function getHistory() {

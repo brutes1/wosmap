@@ -7,6 +7,7 @@ import os
 import json
 import shutil
 import uuid
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict
@@ -86,7 +87,7 @@ class MapRequest(BaseModel):
     latitude: Optional[float] = Field(None, ge=-90, le=90, description="Center latitude")
     longitude: Optional[float] = Field(None, ge=-180, le=180, description="Center longitude")
     scale: int = Field(3463, ge=1000, le=10000, description="Map scale (e.g., 3463 for 1:3463)")
-    size_cm: float = Field(23.0, ge=5, le=50, description="Print size in centimeters")
+    size_cm: float = Field(23.0, ge=5, le=25.6, description="Print size in centimeters (max 25.6 = 256mm bed limit)")
     include_buildings: bool = Field(True, description="Whether to include buildings")
     data_source: str = Field("osm", description="Data source: 'osm' or 'overture' (osm_ms accepted for backwards compatibility)")
     layers: Optional[LayerConfig] = Field(default_factory=LayerConfig, description="Map layers to include")
@@ -154,10 +155,16 @@ async def get_capabilities():
 
     orca_path = find_orcaslicer()
 
+    # Multi-color 3MF is always available (no slicer needed)
+    formats = ["stl", "svg", "multicolor-3mf"]
+    if orca_path:
+        formats.append("3mf")
+
     return {
         "slicer_available": orca_path is not None,
         "slicer_path": orca_path,
-        "download_formats": ["stl", "svg"] + (["3mf"] if orca_path else []),
+        "multicolor_available": True,
+        "download_formats": formats,
     }
 
 
@@ -331,8 +338,39 @@ async def download_map(job_id: str, file_type: str = "stl"):
 
     files = data.get("files", {})
 
+    # Handle multi-color 3MF: combine feature STLs with material colors
+    if file_type == "multicolor-3mf":
+        feature_stls = files.get("feature_stls", {})
+        if not feature_stls:
+            raise HTTPException(
+                status_code=404,
+                detail="Feature STL files not available. Regenerate the map to get multi-color support."
+            )
+
+        stl_path = files.get("stl")
+        if stl_path is None:
+            raise HTTPException(status_code=404, detail="Base STL file not found")
+
+        multicolor_path = Path(stl_path).with_suffix(".multicolor.3mf")
+
+        # Check if multicolor 3MF already exists (cached)
+        if not multicolor_path.exists():
+            import sys
+            sys.path.insert(0, str(Path(__file__).parent.parent / "converter"))
+            from multicolor_3mf import create_multicolor_3mf
+
+            try:
+                create_multicolor_3mf(feature_stls, str(multicolor_path))
+            except Exception as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"Multi-color 3MF generation failed: {e}"
+                )
+
+        file_path = multicolor_path
+
     # Handle 3MF: slice on-demand if not already cached
-    if file_type == "3mf":
+    elif file_type == "3mf":
         stl_path = files.get("stl")
         if stl_path is None:
             raise HTTPException(status_code=404, detail="STL file not found for slicing")
@@ -342,12 +380,11 @@ async def download_map(job_id: str, file_type: str = "stl"):
 
         # Check if 3MF already exists (cached)
         if not threemf_path.exists():
-            from printer import slice_to_3mf, PrinterError, PROFILES_DIR
-
-            profile_path = PROFILES_DIR / "tactile_map_ironing.json"
+            from printer import slice_to_3mf, PrinterError
 
             try:
-                slice_to_3mf(str(stl_path), str(threemf_path), str(profile_path))
+                # Slice without profile - OrcaSlicer uses sensible defaults
+                slice_to_3mf(str(stl_path), str(threemf_path))
             except PrinterError as e:
                 raise HTTPException(
                     status_code=500,
@@ -376,13 +413,14 @@ async def download_map(job_id: str, file_type: str = "stl"):
     if not file_path.exists():
         raise HTTPException(status_code=404, detail="File not found on disk")
 
-    # Determine content type
+    # Determine content type and file extension
     content_types = {
         "stl": "application/sla",
         "svg": "image/svg+xml",
         "blend": "application/octet-stream",
         "pdf": "application/pdf",
         "3mf": "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
+        "multicolor-3mf": "application/vnd.ms-package.3dmanufacturing-3dmodel+xml",
     }
 
     # Generate user-friendly filename: wosmap_[location]_[date].stl
@@ -394,12 +432,106 @@ async def download_map(job_id: str, file_type: str = "stl"):
     else:
         date_str = datetime.utcnow().strftime("%Y-%m-%d")
 
-    filename = f"wosmap_{location_name}_{date_str}.{file_type}"
+    # Handle layer STL files (stl_buildings, stl_roads, etc.)
+    if file_type.startswith("stl_"):
+        layer_name = file_type[4:]  # Remove "stl_" prefix
+        filename = f"wosmap_{location_name}_{date_str}_{layer_name}.stl"
+        content_type = "application/sla"
+    elif file_type == "multicolor-3mf":
+        filename = f"wosmap_{location_name}_{date_str}_multicolor.3mf"
+        content_type = content_types.get(file_type, "application/octet-stream")
+    else:
+        filename = f"wosmap_{location_name}_{date_str}.{file_type}"
+        content_type = content_types.get(file_type, "application/octet-stream")
 
     return FileResponse(
         path=file_path,
         filename=filename,
-        media_type=content_types.get(file_type, "application/octet-stream")
+        media_type=content_type
+    )
+
+
+@app.get("/api/maps/{job_id}/download-all")
+async def download_all_files(job_id: str):
+    """
+    Download all generated files as a ZIP archive.
+
+    Includes:
+    - Combined STL
+    - Individual layer STLs (buildings, roads, trails, water, parks, base)
+    - SVG preview
+    - 3MF (if slicer available)
+    """
+    r = get_redis()
+    result = r.get(f"result:{job_id}")
+
+    if result is None:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    data = json.loads(result)
+
+    if data.get("status") != "completed":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Job is not completed. Current status: {data.get('status')}"
+        )
+
+    files = data.get("files", {})
+    feature_stls = files.get("feature_stls", {})
+
+    # Get location name and date for filenames
+    location_name = data.get("location_name", "map")
+    created_at = data.get("created_at", "")
+    if created_at:
+        date_str = created_at.split("T")[0]
+    else:
+        date_str = datetime.utcnow().strftime("%Y-%m-%d")
+
+    # Create ZIP file
+    stl_path = files.get("stl")
+    if stl_path is None:
+        raise HTTPException(status_code=404, detail="STL file not found")
+
+    job_dir = Path(stl_path).parent
+    zip_path = job_dir / f"wosmap_{location_name}_{date_str}.zip"
+
+    # Build the ZIP if it doesn't exist or regenerate
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+        # Add combined STL
+        if stl_path and Path(stl_path).exists():
+            zf.write(stl_path, f"wosmap_{location_name}_combined.stl")
+
+        # Add individual layer STLs
+        for layer_name, layer_path in feature_stls.items():
+            if Path(layer_path).exists():
+                zf.write(layer_path, f"wosmap_{location_name}_{layer_name}.stl")
+
+        # Add SVG if available
+        svg_path = files.get("svg")
+        if svg_path and Path(svg_path).exists():
+            zf.write(svg_path, f"wosmap_{location_name}.svg")
+
+        # Add pre-sliced 3MF if available
+        threemf_path = Path(stl_path).with_suffix(".3mf")
+        if threemf_path.exists():
+            zf.write(threemf_path, f"wosmap_{location_name}_presliced.3mf")
+
+        # Add multi-color 3MF if it exists
+        multicolor_path = Path(stl_path).with_suffix(".multicolor.3mf")
+        if multicolor_path.exists():
+            zf.write(multicolor_path, f"wosmap_{location_name}_multicolor.3mf")
+
+    # Security: Validate file is within MAPS_DIR
+    try:
+        if not zip_path.resolve().is_relative_to(MAPS_DIR.resolve()):
+            raise HTTPException(status_code=403, detail="Access denied")
+    except ValueError:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    return FileResponse(
+        path=zip_path,
+        filename=f"wosmap_{location_name}_{date_str}.zip",
+        media_type="application/zip"
     )
 
 

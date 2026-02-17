@@ -1,6 +1,6 @@
 <template>
-  <div class="bg-gradient-to-br from-slate-50 to-white rounded-2xl border border-slate-200 p-6 mt-6">
-    <h3 class="text-lg font-bold text-slate-900 mb-4">Generating Map...</h3>
+  <div class="bg-surface-1 rounded-2xl border border-white/[0.06] p-6">
+    <h3 class="text-lg font-display font-bold text-white mb-4">Generating Map...</h3>
 
     <div class="flex flex-wrap gap-2">
       <span
@@ -13,11 +13,11 @@
       </span>
     </div>
 
-    <p v-if="stageMessage" class="mt-4 text-sm text-slate-600">
+    <p v-if="stageMessage" class="mt-4 text-sm text-white/60">
       {{ stageMessage }}
     </p>
 
-    <p v-if="error" class="mt-4 text-sm text-danger-600 font-medium">
+    <p v-if="error" class="mt-4 text-sm text-danger-500 font-medium">
       {{ error }}
     </p>
   </div>
@@ -55,9 +55,9 @@ export default {
       if (stageIndex < currentIndex) {
         return 'bg-success-500 text-white'
       } else if (stageIndex === currentIndex) {
-        return 'bg-primary-500 text-white animate-pulse'
+        return 'bg-primary-500 text-navy-950 animate-pulse'
       } else {
-        return 'bg-slate-200 text-slate-500'
+        return 'bg-surface-2 text-white/30'
       }
     }
   }
