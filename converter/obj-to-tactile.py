@@ -737,7 +737,8 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
                 elif 'Park' in ob.name or ob.name.startswith('Leisure'):
                     parks.append(ob)
                 else:
-                    print("UNHANDLED INNER OBJECT TYPE: " + ob.name)
+                    print("UNHANDLED INNER OBJECT TYPE (deleting): " + ob.name)
+                    deleteables.append(ob)
             elif n_outside == n_total:
                 deleteables.append(ob)
             else:
@@ -749,7 +750,8 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
                 elif 'Park' in ob.name or ob.name.startswith('Leisure'):
                     parks.append(ob)
                 else:
-                    print("UNHANDLED CLIPPABLE OBJECT TYPE: " + ob.name)
+                    print("UNHANDLED CLIPPABLE OBJECT TYPE (deleting): " + ob.name)
+                    deleteables.append(ob)
     print("initial steps took %.2f" % (time.perf_counter() - t))
 
     # Delete
@@ -847,6 +849,20 @@ def process_objects(min_x, min_y, max_x, max_y, scale, no_borders):
 def make_tactile_map(args):
     t = time.perf_counter()
     min_x, min_y, max_x, max_y = (args.min_x, args.min_y, args.max_x, args.max_y)
+
+    # Override bounds to enforce exact square print size.
+    # OSM2World bounds can be non-square and larger than the target area
+    # because features extend beyond the requested bbox.
+    if args.size and args.scale:
+        half_extent = args.size * args.scale / 200  # in Blender/OSM2World units
+        center_x = (min_x + max_x) / 2
+        center_y = (min_y + max_y) / 2
+        min_x = center_x - half_extent
+        max_x = center_x + half_extent
+        min_y = center_y - half_extent
+        max_y = center_y + half_extent
+        print(f"Enforced square bounds: {max_x - min_x:.1f} x {max_y - min_y:.1f} units "
+              f"(target {args.size}cm = {args.size * 10:.0f}mm)")
 
     process_objects(min_x, min_y, max_x, max_y, args.scale, args.no_borders)
     print("process_objects() took " + (str(time.perf_counter() - t)))

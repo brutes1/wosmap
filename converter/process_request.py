@@ -55,7 +55,7 @@ def process_map_request(job: dict, work_dir: str = "/data/maps", status_callback
     lat = job["latitude"]
     lon = job["longitude"]
     scale = job.get("scale", 3463)
-    size_cm = job.get("size_cm", 23.0)
+    size_cm = min(job.get("size_cm", 23.0), 25.6)
     include_buildings = job.get("include_buildings", True)
     data_source = job.get("data_source", "osm")
     location_name = job.get("location_name", "map")
@@ -187,6 +187,14 @@ def process_map_request(job: dict, work_dir: str = "/data/maps", status_callback
     from datetime import datetime
 
     stl_info = get_stl_info(str(stl_path))
+
+    # Safety check: warn if STL dimensions exceed 256mm bed limit
+    if stl_info and stl_info.get("dimensions"):
+        dims = stl_info["dimensions"]
+        for axis in ("x_mm", "y_mm"):
+            if dims.get(axis, 0) > 257:
+                print(f"WARNING: STL {axis} = {dims[axis]}mm exceeds 256mm bed limit")
+
     date_str = datetime.utcnow().strftime("%Y-%m-%d")
     filename = f"wosmap_{location_name}_{date_str}.stl"
 

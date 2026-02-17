@@ -87,7 +87,7 @@ class MapRequest(BaseModel):
     latitude: Optional[float] = Field(None, ge=-90, le=90, description="Center latitude")
     longitude: Optional[float] = Field(None, ge=-180, le=180, description="Center longitude")
     scale: int = Field(3463, ge=1000, le=10000, description="Map scale (e.g., 3463 for 1:3463)")
-    size_cm: float = Field(23.0, ge=5, le=50, description="Print size in centimeters")
+    size_cm: float = Field(23.0, ge=5, le=25.6, description="Print size in centimeters (max 25.6 = 256mm bed limit)")
     include_buildings: bool = Field(True, description="Whether to include buildings")
     data_source: str = Field("osm", description="Data source: 'osm' or 'overture' (osm_ms accepted for backwards compatibility)")
     layers: Optional[LayerConfig] = Field(default_factory=LayerConfig, description="Map layers to include")
