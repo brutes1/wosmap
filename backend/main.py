@@ -355,8 +355,6 @@ async def download_map(job_id: str, file_type: str = "stl"):
 
         # Check if multicolor 3MF already exists (cached)
         if not multicolor_path.exists():
-            import sys
-            sys.path.insert(0, str(Path(__file__).parent.parent / "converter"))
             from multicolor_3mf import create_multicolor_3mf
 
             try:

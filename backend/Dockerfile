@@ -55,6 +55,8 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY backend/*.py .
 COPY backend/profiles ./profiles
+# multicolor_3mf is used by the download endpoint for on-demand 3MF generation
+COPY converter/multicolor_3mf.py .
 
 # Environment variables
 ENV REDIS_HOST=redis

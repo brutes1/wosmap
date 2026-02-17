@@ -118,13 +118,14 @@ def read_stl(stl_path: str) -> tuple:
     return read_stl_binary(stl_path)
 
 
-def create_3mf_model_xml(objects: list, materials: list) -> str:
+def create_3mf_model_xml(objects: list, materials: list, bed_center: tuple = (128, 128)) -> str:
     """
     Create the 3D Model XML content for the 3MF file.
 
     Args:
         objects: List of dicts with 'id', 'vertices', 'triangles', 'material_id'
         materials: List of dicts with 'id', 'name', 'color'
+        bed_center: (x, y) center of the build plate in mm (default 128,128 for 256mm bed)
     """
     # Create root element with namespaces
     root = ET.Element('model')
@@ -176,11 +177,16 @@ def create_3mf_model_xml(objects: list, materials: list) -> str:
             tri.set('v2', str(t[1]))
             tri.set('v3', str(t[2]))
 
-    # Create build section
+    # Create build section — translate model to bed center
+    # STL is centered at origin, but 3MF build plate origin is front-left corner.
+    # Bambu X1C bed is 256x256mm, center at (128, 128).
     build = ET.SubElement(root, 'build')
+    tx, ty = bed_center
     for obj in objects:
         item = ET.SubElement(build, 'item')
         item.set('objectid', str(obj['id']))
+        # 3MF transform is a 3x4 affine matrix (row-major): identity rotation + translation
+        item.set('transform', f'1 0 0 0 1 0 0 0 1 {tx} {ty} 0')
 
     # Generate XML string
     ET.indent(root)
