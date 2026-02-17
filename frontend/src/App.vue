@@ -1,42 +1,65 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+  <div class="min-h-screen bg-navy-950">
     <AppHeader />
 
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-6">
       <!-- Location Selection -->
-      <section class="mb-6">
-        <LocationSection
-          v-model:latitude="latitude"
-          v-model:longitude="longitude"
-          :scale="scale"
-          :size-cm="sizeCm"
+      <LocationSection
+        v-model:latitude="latitude"
+        v-model:longitude="longitude"
+        :scale="scale"
+        :size-cm="sizeCm"
+        :disabled="isProcessing"
+      />
+
+      <!-- Settings Row: Print + Layers side by side -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <PrintSettings
+          v-model:scale="scale"
+          v-model:size-cm="sizeCm"
           :disabled="isProcessing"
         />
-      </section>
+        <LayerSettings
+          v-model="layers"
+          :disabled="isProcessing"
+        />
+      </div>
 
-      <!-- Settings and Generate Button -->
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-        <div class="lg:col-span-2 space-y-6">
-          <PrintSettings
-            v-model:scale="scale"
-            v-model:size-cm="sizeCm"
-            v-model:include-buildings="includeBuildings"
-            v-model:data-source="dataSource"
+      <!-- Data Source Toggle -->
+      <div class="flex items-center justify-center gap-3 py-3">
+        <span class="text-sm font-medium text-white/50">Data source</span>
+        <div class="flex rounded-lg overflow-hidden border border-white/[0.08]">
+          <button
+            type="button"
+            @click="dataSource = 'osm'"
             :disabled="isProcessing"
-          />
-          <LayerSettings
-            v-model="layers"
+            class="px-4 py-2 text-sm font-medium transition-all disabled:opacity-50"
+            :class="dataSource === 'osm'
+              ? 'bg-primary-600 text-navy-950'
+              : 'bg-surface-1 text-white/60 hover:bg-surface-2 hover:text-white/80'"
+          >
+            OpenStreetMap
+          </button>
+          <button
+            type="button"
+            @click="dataSource = 'overture'"
             :disabled="isProcessing"
-          />
-        </div>
-        <div class="lg:col-span-1 flex items-end">
-          <GenerateButton
-            @click="generateMap"
-            :disabled="!isValid"
-            :loading="isProcessing"
-          />
+            class="px-4 py-2 text-sm font-medium transition-all disabled:opacity-50"
+            :class="dataSource === 'overture'
+              ? 'bg-primary-600 text-navy-950'
+              : 'bg-surface-1 text-white/60 hover:bg-surface-2 hover:text-white/80'"
+          >
+            Overture Maps
+          </button>
         </div>
       </div>
+
+      <!-- Generate Button (full-width) -->
+      <GenerateButton
+        @click="generateMap"
+        :disabled="!isValid"
+        :loading="isProcessing"
+      />
 
       <!-- Progress (while generating) -->
       <GeneratorProgress
@@ -116,7 +139,6 @@ export default {
       // Print settings
       scale: 3463,
       sizeCm: 23,
-      includeBuildings: true,
       dataSource: 'overture',
 
       // Map layers
@@ -194,12 +216,12 @@ export default {
       this.fileInfo = null
 
       try {
+        const sizeCm = Math.min(Math.max(this.sizeCm, 5), 25.6)
         const params = {
           latitude: this.latitude,
           longitude: this.longitude,
           scale: this.scale,
-          size_cm: this.sizeCm,
-          include_buildings: this.includeBuildings,
+          size_cm: sizeCm,
           data_source: this.dataSource,
           layers: this.layers
         }

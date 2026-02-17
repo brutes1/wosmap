@@ -1,11 +1,11 @@
 <template>
-  <header class="bg-white border-b border-slate-100">
-    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-      <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-primary-600 via-primary-500 to-accent-500 bg-clip-text text-transparent">
+  <header class="bg-navy-950 border-b border-white/[0.06]">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-6 flex items-baseline gap-4">
+      <h1 class="text-2xl sm:text-3xl font-display font-extrabold tracking-tight bg-gradient-to-r from-primary-300 to-primary-500 bg-clip-text text-transparent">
         WOSMap
       </h1>
-      <p class="mt-2 text-slate-600 text-base sm:text-lg">
-        Capture the world exactly as it was the moment your story changed
+      <p class="text-white/40 text-sm hidden sm:block">
+        Tactile map generator
       </p>
     </div>
   </header>

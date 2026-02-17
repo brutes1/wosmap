@@ -1,47 +1,63 @@
 @import "tailwindcss";
 
 @theme {
-  /* Bold Primary - Vibrant Blue */
-  --color-primary-50: oklch(0.97 0.02 250);
-  --color-primary-100: oklch(0.93 0.05 250);
-  --color-primary-200: oklch(0.87 0.08 250);
-  --color-primary-300: oklch(0.78 0.12 250);
-  --color-primary-400: oklch(0.68 0.16 250);
-  --color-primary-500: oklch(0.58 0.19 250);
-  --color-primary-600: oklch(0.50 0.18 250);
-  --color-primary-700: oklch(0.42 0.15 250);
+  /* Dark Cartographic Palette — warm neutral base */
+  --color-navy-950: oklch(0.14 0.015 260);
+  --color-navy-900: oklch(0.17 0.02 260);
+  --color-navy-800: oklch(0.22 0.02 260);
+  --color-navy-700: oklch(0.28 0.02 260);
+  --color-navy-600: oklch(0.36 0.02 260);
+  --color-navy-500: oklch(0.45 0.02 260);
 
-  /* Accent - Vibrant Coral/Orange */
-  --color-accent-400: oklch(0.75 0.18 30);
-  --color-accent-500: oklch(0.68 0.20 30);
-  --color-accent-600: oklch(0.60 0.18 30);
+  /* Surface layers — subtle warm lift for cards and inputs */
+  --color-surface-1: oklch(0.22 0.015 260);
+  --color-surface-2: oklch(0.26 0.015 260);
+  --color-surface-3: oklch(0.30 0.015 260);
 
-  /* Success - Vibrant Green */
-  --color-success-500: oklch(0.65 0.18 145);
-  --color-success-600: oklch(0.55 0.16 145);
+  /* Primary - Warm Gold */
+  --color-primary-300: oklch(0.87 0.12 80);
+  --color-primary-400: oklch(0.80 0.14 78);
+  --color-primary-500: oklch(0.73 0.15 76);
+  --color-primary-600: oklch(0.65 0.14 74);
+  --color-primary-700: oklch(0.55 0.12 72);
 
-  /* Warning - Amber */
+  /* Accent - Copper */
+  --color-accent-400: oklch(0.72 0.13 50);
+  --color-accent-500: oklch(0.65 0.14 50);
+  --color-accent-600: oklch(0.55 0.12 50);
+
+  /* Success - Teal */
+  --color-success-400: oklch(0.72 0.12 170);
+  --color-success-500: oklch(0.65 0.12 170);
+  --color-success-600: oklch(0.55 0.11 170);
+
+  /* Warning */
   --color-warning-500: oklch(0.80 0.15 85);
 
-  /* Danger - Red */
-  --color-danger-500: oklch(0.60 0.20 25);
-  --color-danger-600: oklch(0.52 0.18 25);
+  /* Danger */
+  --color-danger-400: oklch(0.68 0.18 25);
+  --color-danger-500: oklch(0.60 0.18 25);
+  --color-danger-600: oklch(0.52 0.16 25);
 
   /* Typography */
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "DM Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Playfair Display", ui-serif, Georgia, serif;
 }
 
-/* Leaflet CSS protection - prevent Tailwind reset from breaking map controls */
-.leaflet-container button {
-  all: revert;
-}
-
-.leaflet-container a {
-  all: revert;
-}
-
-/* Ensure Leaflet controls maintain their styling */
+/* Leaflet CSS protection */
+.leaflet-container button { all: revert; }
+.leaflet-container a { all: revert; }
 .leaflet-control-zoom a,
-.leaflet-control-attribution a {
-  all: revert;
+.leaflet-control-attribution a { all: revert; }
+
+/* Custom scrollbar for dark theme */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: oklch(0.35 0.02 260); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: oklch(0.45 0.02 260); }
+
+/* Select option styling for dark inputs */
+select option {
+  background: oklch(0.17 0.02 260);
+  color: white;
 }
