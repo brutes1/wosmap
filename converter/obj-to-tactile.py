@@ -70,6 +70,18 @@ def get_minimum_coordinate(ob):
         min_z = min(min_z, corner[2])
     return (min_x, min_y, min_z)
 
+def get_center_offset_for_origin(base_cube):
+    """Calculate offset to center model in X/Y at origin, with Z bottom at 0.
+    This ensures slicers place the model centered on the build plate."""
+    bbox_corners = [base_cube.matrix_world @ mathutils.Vector(corner) for corner in base_cube.bound_box]
+    xs = [c[0] for c in bbox_corners]
+    ys = [c[1] for c in bbox_corners]
+    zs = [c[2] for c in bbox_corners]
+    center_x = (min(xs) + max(xs)) / 2
+    center_y = (min(ys) + max(ys)) / 2
+    min_z = min(zs)
+    return (-center_x, -center_y, -min_z)
+
 def move_everything(move_by):
     vector = mathutils.Vector(move_by)
     for ob in bpy.context.scene.objects:
@@ -884,7 +896,7 @@ def main():
         base_path = os.path.splitext(obj_path)[0]
         export_svg(base_path, args)
         base_cube = make_tactile_map(args)
-        move_everything([-c for c in get_minimum_coordinate(base_cube)])
+        move_everything(get_center_offset_for_origin(base_cube))
         if not args.no_stl_export:
             export_stl(base_path, args.scale)
             export_stl_separate(base_path, args.scale)
