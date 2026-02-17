@@ -43,9 +43,8 @@
         Download All (ZIP)
       </a>
 
-      <!-- 3MF Download - only shown when slicer is available -->
+      <!-- 3MF Download -->
       <a
-        v-if="slicerAvailable"
         :href="threemfUrl"
         download
         class="flex-1 flex items-center justify-center gap-2 px-5 py-3 bg-accent-500 hover:bg-accent-600 text-white font-semibold rounded-xl shadow-lg shadow-accent-500/20 transition-all"

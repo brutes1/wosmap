@@ -17,6 +17,7 @@
         <PrintSettings
           v-model:scale="scale"
           v-model:size-cm="sizeCm"
+          v-model:optimize-print="optimizePrint"
           :disabled="isProcessing"
         />
         <LayerSettings
@@ -140,6 +141,7 @@ export default {
       scale: 3463,
       sizeCm: 23,
       dataSource: 'overture',
+      optimizePrint: false,
 
       // Map layers
       layers: {
@@ -201,7 +203,7 @@ export default {
 
     download3mfUrl() {
       if (!this.jobId) return '#'
-      return getDownloadUrl(this.jobId, '3mf')
+      return getDownloadUrl(this.jobId, 'multicolor-3mf')
     }
   },
 
@@ -223,7 +225,8 @@ export default {
           scale: this.scale,
           size_cm: sizeCm,
           data_source: this.dataSource,
-          layers: this.layers
+          layers: this.layers,
+          optimize_print: this.optimizePrint
         }
 
         const response = await createMap(params)

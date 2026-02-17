@@ -42,6 +42,30 @@
         </p>
       </div>
     </div>
+
+    <!-- Optimize for Print Toggle -->
+    <div class="mt-4 pt-4 border-t border-white/[0.06]">
+      <label class="flex items-center gap-3 cursor-pointer" :class="{ 'opacity-50 cursor-not-allowed': disabled }">
+        <button
+          type="button"
+          role="switch"
+          :aria-checked="optimizePrint"
+          @click="!disabled && $emit('update:optimizePrint', !optimizePrint)"
+          :disabled="disabled"
+          class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed"
+          :class="optimizePrint ? 'bg-primary-500' : 'bg-surface-3'"
+        >
+          <span
+            class="inline-block h-4 w-4 rounded-full bg-white transition-transform"
+            :class="optimizePrint ? 'translate-x-6' : 'translate-x-1'"
+          />
+        </button>
+        <div>
+          <span class="text-sm font-medium text-white">Optimize for Print</span>
+          <p class="text-xs text-white/40 mt-0.5">Ironing + fine layers for smooth surfaces (~2x print time)</p>
+        </div>
+      </label>
+    </div>
   </div>
 </template>
 
@@ -58,13 +82,17 @@ export default {
       type: Number,
       required: true
     },
+    optimizePrint: {
+      type: Boolean,
+      default: false
+    },
     disabled: {
       type: Boolean,
       default: false
     }
   },
 
-  emits: ['update:scale', 'update:sizeCm'],
+  emits: ['update:scale', 'update:sizeCm', 'update:optimizePrint'],
 
   data() {
     return {

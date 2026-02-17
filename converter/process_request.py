@@ -59,6 +59,7 @@ def process_map_request(job: dict, work_dir: str = "/data/maps", status_callback
     include_buildings = job.get("include_buildings", True)
     data_source = job.get("data_source", "osm")
     location_name = job.get("location_name", "map")
+    optimize_print = job.get("optimize_print", False)
     layers = job.get("layers", {
         "buildings": True,
         "roads": True,
@@ -202,6 +203,7 @@ def process_map_request(job: dict, work_dir: str = "/data/maps", status_callback
         "status": "completed",
         "job_id": job_id,
         "files": output_files,
+        "optimize_print": optimize_print,
         "file_info": {
             "filename": filename,
             **stl_info

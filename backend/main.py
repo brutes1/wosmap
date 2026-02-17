@@ -91,6 +91,7 @@ class MapRequest(BaseModel):
     include_buildings: bool = Field(True, description="Whether to include buildings")
     data_source: str = Field("osm", description="Data source: 'osm' or 'overture' (osm_ms accepted for backwards compatibility)")
     layers: Optional[LayerConfig] = Field(default_factory=LayerConfig, description="Map layers to include")
+    optimize_print: bool = Field(False, description="Embed optimized print settings (ironing, fine layers) in 3MF")
 
 
 class MapResponse(BaseModel):
@@ -218,6 +219,7 @@ async def create_map(request: MapRequest):
         "include_buildings": request.include_buildings,
         "data_source": request.data_source,
         "layers": layers.model_dump(),
+        "optimize_print": request.optimize_print,
         "location_name": location_name,
         "created_at": datetime.utcnow().isoformat(),
     }
@@ -351,14 +353,16 @@ async def download_map(job_id: str, file_type: str = "stl"):
         if stl_path is None:
             raise HTTPException(status_code=404, detail="Base STL file not found")
 
-        multicolor_path = Path(stl_path).with_suffix(".multicolor.3mf")
+        optimize_print = data.get("optimize_print", False)
+        suffix = ".multicolor.optimized.3mf" if optimize_print else ".multicolor.3mf"
+        multicolor_path = Path(stl_path).with_suffix(suffix)
 
         # Check if multicolor 3MF already exists (cached)
         if not multicolor_path.exists():
             from multicolor_3mf import create_multicolor_3mf
 
             try:
-                create_multicolor_3mf(feature_stls, str(multicolor_path))
+                create_multicolor_3mf(feature_stls, str(multicolor_path), optimize_print=optimize_print)
             except Exception as e:
                 raise HTTPException(
                     status_code=500,
