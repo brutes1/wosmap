@@ -21,7 +21,7 @@ build/
 .env.local
 
 # Docker volumes
-data/
+/data/
 
 # OS files
 .DS_Store
