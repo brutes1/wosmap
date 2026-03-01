@@ -55,10 +55,19 @@ def process_map_request(job: dict, work_dir: str = "/data/maps", status_callback
     lat = job["latitude"]
     lon = job["longitude"]
     scale = job.get("scale", 3463)
-    size_cm = job.get("size_cm", 23.0)
+    size_cm = min(job.get("size_cm", 23.0), 25.6)
     include_buildings = job.get("include_buildings", True)
     data_source = job.get("data_source", "osm")
     location_name = job.get("location_name", "map")
+    layers = job.get("layers", {
+        "buildings": True,
+        "roads": True,
+        "water": True,
+        "rivers": False,
+        "parks": False,
+        "trails": False,
+        "terrain": False,
+    })
 
     # Create job directory
     job_dir = Path(work_dir) / job_id
@@ -80,6 +89,7 @@ def process_map_request(job: dict, work_dir: str = "/data/maps", status_callback
     print(f"  Location: {lat}, {lon}")
     print(f"  Scale: 1:{scale}, Size: {size_cm}cm, Diameter: {diameter}m")
     print(f"  Bounding box: {bbox}")
+    print(f"  Layers: {layers}")
 
     # Step 1: Fetch OSM data
     update_stage("fetching_osm", "Fetching map data from OpenStreetMap...")
@@ -87,13 +97,13 @@ def process_map_request(job: dict, work_dir: str = "/data/maps", status_callback
     try:
         # If using Overture, update stage before fetching
         if data_source in ("overture", "osm_ms"):
-            osm_data = get_map_data(lat, lon, diameter, "osm", work_dir=str(job_dir))
+            osm_data = get_map_data(lat, lon, diameter, "osm", work_dir=str(job_dir), layers=layers)
             osm_path.write_text(osm_data)
             update_stage("fetching_overture", "Fetching building data from Overture Maps...")
-            osm_data = get_map_data(lat, lon, diameter, data_source, work_dir=str(job_dir))
+            osm_data = get_map_data(lat, lon, diameter, data_source, work_dir=str(job_dir), layers=layers)
             osm_path.write_text(osm_data)
         else:
-            osm_data = get_map_data(lat, lon, diameter, data_source, work_dir=str(job_dir))
+            osm_data = get_map_data(lat, lon, diameter, data_source, work_dir=str(job_dir), layers=layers)
             osm_path.write_text(osm_data)
         print(f"  Saved OSM data to {osm_path} ({len(osm_data)} bytes)")
     except Exception as e:
@@ -155,6 +165,17 @@ def process_map_request(job: dict, work_dir: str = "/data/maps", status_callback
         if file_path.exists():
             output_files[ext] = str(file_path)
 
+    # Collect feature-specific STL files for multi-color 3MF
+    feature_stls = {}
+    for feature_type in ["buildings", "roads", "water", "parks", "rails", "base"]:
+        feature_path = job_dir / f"map.{feature_type}.stl"
+        if feature_path.exists():
+            feature_stls[feature_type] = str(feature_path)
+            output_files[f"stl_{feature_type}"] = str(feature_path)
+
+    if feature_stls:
+        output_files["feature_stls"] = feature_stls
+
     # Read metadata if available
     meta_path = job_dir / "map-meta.json"
     metadata = {}
@@ -166,6 +187,14 @@ def process_map_request(job: dict, work_dir: str = "/data/maps", status_callback
     from datetime import datetime
 
     stl_info = get_stl_info(str(stl_path))
+
+    # Safety check: warn if STL dimensions exceed 256mm bed limit
+    if stl_info and stl_info.get("dimensions"):
+        dims = stl_info["dimensions"]
+        for axis in ("x_mm", "y_mm"):
+            if dims.get(axis, 0) > 257:
+                print(f"WARNING: STL {axis} = {dims[axis]}mm exceeds 256mm bed limit")
+
     date_str = datetime.utcnow().strftime("%Y-%m-%d")
     filename = f"wosmap_{location_name}_{date_str}.stl"
 

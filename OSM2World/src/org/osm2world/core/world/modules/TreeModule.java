@@ -165,14 +165,16 @@ public class TreeModule extends ConfigurableWorldModule {
 		}
 
 		for (MapArea area : mapData.getMapAreas()) {
-			
+
 			if (area.getTags().contains("natural", "wood")
 					|| area.getTags().contains("landuse", "forest")
 					|| area.getTags().containsKey("wood")
-					|| area.getTags().contains("landuse", "orchard")) {
+					|| area.getTags().contains("landuse", "orchard")
+					|| area.getTags().contains("leisure", "park")
+					|| area.getTags().contains("landuse", "recreation_ground")) {
 				area.addRepresentation(new Forest(area, mapData));
 			}
-			
+
 		}
 		
 	}

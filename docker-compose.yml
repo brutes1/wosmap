@@ -13,10 +13,12 @@ services:
     restart: unless-stopped
 
   # Backend - FastAPI REST API
+  # Platform set to amd64 for OrcaSlicer compatibility (runs via Rosetta on ARM Macs)
   backend:
     build:
       context: .
       dockerfile: backend/Dockerfile
+    platform: linux/amd64
     ports:
       - "8000:8000"
     environment:
