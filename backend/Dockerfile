@@ -55,6 +55,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY backend/*.py .
 COPY backend/profiles ./profiles
+COPY converter/multicolor_3mf.py .
 
 # Environment variables
 ENV REDIS_HOST=redis
