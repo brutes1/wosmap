@@ -118,13 +118,39 @@ def read_stl(stl_path: str) -> tuple:
     return read_stl_binary(stl_path)
 
 
-def create_3mf_model_xml(objects: list, materials: list) -> str:
+def compute_centering_transform(objects: list, plate_size_mm: float = 256.0) -> str:
+    """
+    Compute a 3MF transform string to center all objects on the print bed.
+
+    Without a transform, objects are placed at their raw STL coordinates which
+    start at (0,0) — the plate edge. Skirt/brim then prints at negative
+    coordinates, triggering "g-code path goes beyond plate boundaries".
+
+    Returns a 3MF row-major 3x4 transform string: identity rotation + XY translation.
+    """
+    min_x = min_y = float('inf')
+    max_x = max_y = float('-inf')
+    for obj in objects:
+        for v in obj['vertices']:
+            min_x = min(min_x, v[0])
+            max_x = max(max_x, v[0])
+            min_y = min(min_y, v[1])
+            max_y = max(max_y, v[1])
+
+    plate_center = plate_size_mm / 2
+    tx = plate_center - (min_x + max_x) / 2
+    ty = plate_center - (min_y + max_y) / 2
+    return f"1 0 0 0 1 0 0 0 1 {tx:.6f} {ty:.6f} 0"
+
+
+def create_3mf_model_xml(objects: list, materials: list, transform: str = None) -> str:
     """
     Create the 3D Model XML content for the 3MF file.
 
     Args:
         objects: List of dicts with 'id', 'vertices', 'triangles', 'material_id'
         materials: List of dicts with 'id', 'name', 'color'
+        transform: Optional 3MF transform string applied to each build item
     """
     # Create root element with namespaces
     root = ET.Element('model')
@@ -181,6 +207,8 @@ def create_3mf_model_xml(objects: list, materials: list) -> str:
     for obj in objects:
         item = ET.SubElement(build, 'item')
         item.set('objectid', str(obj['id']))
+        if transform:
+            item.set('transform', transform)
 
     # Generate XML string
     ET.indent(root)
@@ -330,6 +358,10 @@ def create_multicolor_3mf(stl_files: Dict[str, str], output_path: str) -> str:
     # Create 3MF package
     print(f"Creating 3MF with {len(objects)} objects and {len(materials)} materials")
 
+    # Center model on the 256x256mm X1C plate so skirt/brim stay within bounds
+    transform = compute_centering_transform(objects)
+    print(f"  Centering transform: {transform}")
+
     with zipfile.ZipFile(output_path, 'w', zipfile.ZIP_DEFLATED) as zf:
         # Add content types
         zf.writestr('[Content_Types].xml', create_content_types_xml())
@@ -338,7 +370,7 @@ def create_multicolor_3mf(stl_files: Dict[str, str], output_path: str) -> str:
         zf.writestr('_rels/.rels', create_rels_xml())
 
         # Add 3D model
-        model_xml = create_3mf_model_xml(objects, materials)
+        model_xml = create_3mf_model_xml(objects, materials, transform)
         zf.writestr('3D/3dmodel.model', model_xml)
 
         # Add Bambu/OrcaSlicer metadata for extruder assignments
