@@ -202,13 +202,27 @@ def create_3mf_model_xml(objects: list, materials: list, transform: str = None) 
             tri.set('v2', str(t[1]))
             tri.set('v3', str(t[2]))
 
-    # Create build section
-    build = ET.SubElement(root, 'build')
+    # Create a single composite assembly object whose components reference each
+    # mesh. Bambu Studio then treats the whole map as ONE item on the plate
+    # rather than N separate models to auto-arrange side-by-side.
+    assembly_id = max(obj['id'] for obj in objects) + 1
+    assembly_elem = ET.SubElement(resources, 'object')
+    assembly_elem.set('id', str(assembly_id))
+    assembly_elem.set('type', 'model')
+    assembly_elem.set('name', 'WOSMap')
+    components_elem = ET.SubElement(assembly_elem, 'components')
+    identity = '1 0 0 0 1 0 0 0 1 0 0 0'
     for obj in objects:
-        item = ET.SubElement(build, 'item')
-        item.set('objectid', str(obj['id']))
-        if transform:
-            item.set('transform', transform)
+        comp = ET.SubElement(components_elem, 'component')
+        comp.set('objectid', str(obj['id']))
+        comp.set('transform', identity)
+
+    # Single build item for the assembly, with centering transform applied here
+    build = ET.SubElement(root, 'build')
+    item = ET.SubElement(build, 'item')
+    item.set('objectid', str(assembly_id))
+    if transform:
+        item.set('transform', transform)
 
     # Generate XML string
     ET.indent(root)
