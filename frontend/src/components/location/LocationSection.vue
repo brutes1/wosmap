@@ -1,20 +1,11 @@
 <template>
-  <div class="bg-surface-1 rounded-2xl border border-white/[0.06] overflow-hidden">
-    <div class="p-4 sm:p-6 border-b border-white/[0.06]">
-      <h2 class="text-lg font-display font-bold text-white">Select Location</h2>
-      <p class="text-sm text-white/40 mt-1">Search for an address or click on the map</p>
-    </div>
-
-    <div class="h-[300px] sm:h-[350px] md:h-[400px] lg:h-[450px]">
-      <MapSelector
-        v-model:latitude="internalLat"
-        v-model:longitude="internalLng"
-        :scale="scale"
-        :size-cm="sizeCm"
-        :disabled="disabled"
-      />
-    </div>
-  </div>
+  <MapSelector
+    v-model:latitude="internalLat"
+    v-model:longitude="internalLng"
+    :scale="scale"
+    :size-cm="sizeCm"
+    :disabled="disabled"
+  />
 </template>
 
 <script>

@@ -2,7 +2,7 @@
   <div class="min-h-screen bg-navy-950">
     <AppHeader />
 
-    <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-6">
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-6">
       <!-- Location Selection -->
       <LocationSection
         v-model:latitude="latitude"
@@ -12,18 +12,28 @@
         :disabled="isProcessing"
       />
 
-      <!-- Settings Row: Print + Layers side by side -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PrintSettings
-          v-model:scale="scale"
-          v-model:size-cm="sizeCm"
-          :disabled="isProcessing"
-        />
-        <LayerSettings
-          v-model="layers"
-          :disabled="isProcessing"
-        />
-      </div>
+      <!-- Print Settings (compact row) -->
+      <PrintSettings
+        v-model:scale="scale"
+        v-model:size-cm="sizeCm"
+        :disabled="isProcessing"
+      />
+
+      <!-- Map Layers (collapsible) -->
+      <details class="group bg-surface-1 rounded-2xl border border-white/[0.06] overflow-hidden">
+        <summary class="px-4 sm:px-6 py-4 cursor-pointer flex items-center justify-between text-white/60 hover:text-white/90 transition-colors select-none list-none">
+          <span class="text-sm font-medium">Map Layers</span>
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+          </svg>
+        </summary>
+        <div class="border-t border-white/[0.06]">
+          <LayerSettings
+            v-model="layers"
+            :disabled="isProcessing"
+          />
+        </div>
+      </details>
 
       <!-- Data Source Toggle -->
       <div class="flex items-center justify-center gap-3 py-3">

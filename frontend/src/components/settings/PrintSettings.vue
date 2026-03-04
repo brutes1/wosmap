@@ -1,10 +1,10 @@
 <template>
   <div class="bg-surface-1 rounded-2xl border border-white/[0.06] p-4 sm:p-6">
-    <h2 class="text-lg font-display font-bold text-white mb-5">Print Settings</h2>
+    <h2 class="text-lg font-display font-bold text-white mb-4">Print Settings</h2>
 
-    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div class="flex flex-wrap gap-4 items-start">
       <!-- Scale -->
-      <div>
+      <div class="flex-1 min-w-[140px]">
         <label class="block text-sm font-medium text-white/50 mb-2">Map Scale</label>
         <select
           :value="scale"
@@ -22,7 +22,7 @@
       </div>
 
       <!-- Print Size -->
-      <div>
+      <div class="flex-1 min-w-[140px]">
         <label class="block text-sm font-medium text-white/50 mb-2">
           Print Size: <span class="font-semibold text-primary-400">{{ sizeCm }}cm</span>
         </label>

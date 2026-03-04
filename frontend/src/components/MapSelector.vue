@@ -1,34 +1,45 @@
 <template>
-  <div class="w-full h-full flex flex-col">
-    <!-- Address Search -->
-    <div class="flex gap-2 p-3 sm:p-4 bg-navy-950/60 border-b border-white/[0.06]">
-      <input
-        type="text"
-        v-model="searchQuery"
-        @keyup.enter="searchAddress"
-        placeholder="Search for an address..."
-        :disabled="disabled || isSearching"
-        class="flex-1 px-4 py-2.5 bg-surface-2 border border-white/[0.08] rounded-xl text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-      />
-      <button
-        type="button"
-        @click="searchAddress"
-        :disabled="disabled || isSearching || !searchQuery.trim()"
-        class="px-4 py-2.5 bg-primary-600 hover:bg-primary-500 text-navy-950 font-medium rounded-xl text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600 whitespace-nowrap"
-      >
-        {{ isSearching ? '...' : 'Search' }}
-      </button>
+  <div class="w-full bg-surface-1 rounded-2xl border border-white/[0.06] overflow-hidden">
+    <!-- Hero Search Section -->
+    <div class="px-4 sm:px-6 py-4 sm:py-5 border-b border-white/[0.06]">
+      <p class="text-sm font-medium text-white/50 mb-2.5">Find your place</p>
+      <div class="flex gap-2">
+        <div class="flex-1 relative">
+          <span class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+            </svg>
+          </span>
+          <input
+            type="text"
+            v-model="searchQuery"
+            @keyup.enter="searchAddress"
+            placeholder="Enter an address or place..."
+            :disabled="disabled || isSearching"
+            class="w-full pl-10 pr-4 py-3 bg-surface-2 border border-white/[0.08] rounded-xl text-sm text-white placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          />
+        </div>
+        <button
+          type="button"
+          @click="searchAddress"
+          :disabled="disabled || isSearching || !searchQuery.trim()"
+          class="px-5 py-3 bg-primary-600 hover:bg-primary-500 text-navy-950 font-medium rounded-xl text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-primary-600 whitespace-nowrap"
+        >
+          {{ isSearching ? '...' : 'Search' }}
+        </button>
+      </div>
+      <p v-if="searchError" class="mt-2 text-sm text-danger-400">{{ searchError }}</p>
     </div>
 
     <!-- Map Container -->
-    <div
-      ref="mapContainer"
-      class="flex-1 min-h-0"
-      :class="{ 'opacity-70 pointer-events-none': disabled }"
-    ></div>
+    <div class="h-[320px] sm:h-[380px] md:h-[460px] lg:h-[560px] relative">
+      <div ref="mapContainer" class="w-full h-full"></div>
+      <!-- Overlay when disabled: dims and blocks interactions without touching Leaflet's container -->
+      <div v-if="disabled" class="absolute inset-0 bg-navy-950/30"></div>
+    </div>
 
     <!-- Coordinates Display -->
-    <div class="flex justify-between items-center px-3 sm:px-4 py-2.5 bg-navy-950/60 border-t border-white/[0.06] text-sm">
+    <div class="flex justify-between items-center px-4 sm:px-6 py-2.5 bg-navy-950/40 border-t border-white/[0.06] text-sm">
       <span v-if="hasMarker" class="text-white/60 font-mono text-xs">
         {{ latitude?.toFixed(5) }}, {{ longitude?.toFixed(5) }}
       </span>
@@ -95,6 +106,7 @@ export default {
       rectangle: null,
       searchQuery: '',
       isSearching: false,
+      searchError: null,
     }
   },
 
@@ -127,12 +139,10 @@ export default {
           this.map.dragging.disable()
           this.map.touchZoom.disable()
           this.map.doubleClickZoom.disable()
-          this.map.scrollWheelZoom.disable()
         } else {
           this.map.dragging.enable()
           this.map.touchZoom.enable()
           this.map.doubleClickZoom.enable()
-          this.map.scrollWheelZoom.enable()
         }
       }
     },
@@ -162,6 +172,7 @@ export default {
         center,
         zoom,
         zoomControl: true,
+        scrollWheelZoom: false,
       })
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -276,6 +287,7 @@ export default {
       if (!this.searchQuery.trim() || this.isSearching) return
 
       this.isSearching = true
+      this.searchError = null
       try {
         const query = encodeURIComponent(this.searchQuery)
         const response = await fetch(
@@ -299,11 +311,11 @@ export default {
 
           this.map.setView([latitude, longitude], 15)
         } else {
-          alert('Address not found. Try a different search.')
+          this.searchError = 'Address not found. Try a different search.'
         }
       } catch (err) {
         console.error('Geocoding error:', err)
-        alert('Search failed. Please try again.')
+        this.searchError = 'Search failed. Please check your connection and try again.'
       } finally {
         this.isSearching = false
       }

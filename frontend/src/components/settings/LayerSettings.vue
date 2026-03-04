@@ -1,7 +1,6 @@
 <template>
-  <div class="bg-surface-1 rounded-2xl border border-white/[0.06] p-4 sm:p-6">
-    <h2 class="text-lg font-display font-bold text-white mb-2">Map Layers</h2>
-    <p class="text-sm text-white/40 mb-4">Select features to include.</p>
+  <div class="p-4 sm:p-6">
+    <p class="text-sm text-white/40 mb-3">Select features to include in the map.</p>
 
     <div class="space-y-0.5">
       <label
