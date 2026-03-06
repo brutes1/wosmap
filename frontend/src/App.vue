@@ -12,7 +12,41 @@
         :disabled="isProcessing"
       />
 
-      <!-- Settings Row: Print + Layers side by side -->
+      <!-- Map Mode Toggle -->
+      <div class="flex items-center justify-center gap-3 py-1">
+        <span class="text-sm font-medium text-white/50">Map mode</span>
+        <div class="flex rounded-lg overflow-hidden border border-white/[0.08]">
+          <button
+            type="button"
+            @click="mapType = 'standard'"
+            :disabled="isProcessing"
+            class="px-4 py-2 text-sm font-medium transition-all disabled:opacity-50"
+            :class="mapType === 'standard'
+              ? 'bg-primary-600 text-navy-950'
+              : 'bg-surface-1 text-white/60 hover:bg-surface-2 hover:text-white/80'"
+          >
+            Street Map
+          </button>
+          <button
+            type="button"
+            @click="mapType = 'terrain'"
+            :disabled="isProcessing"
+            class="px-4 py-2 text-sm font-medium transition-all disabled:opacity-50"
+            :class="mapType === 'terrain'
+              ? 'bg-primary-600 text-navy-950'
+              : 'bg-surface-1 text-white/60 hover:bg-surface-2 hover:text-white/80'"
+          >
+            Terrain
+          </button>
+        </div>
+      </div>
+
+      <!-- Terrain info banner -->
+      <p v-if="mapType === 'terrain'" class="text-center text-sm text-white/50 -mt-3">
+        Terrain mode renders real-world topography from elevation data. No buildings or roads.
+      </p>
+
+      <!-- Settings Row: Print + Layers side by side (layers hidden in terrain mode) -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <PrintSettings
           v-model:scale="scale"
@@ -20,13 +54,14 @@
           :disabled="isProcessing"
         />
         <LayerSettings
+          v-if="mapType === 'standard'"
           v-model="layers"
           :disabled="isProcessing"
         />
       </div>
 
-      <!-- Data Source Toggle -->
-      <div class="flex items-center justify-center gap-3 py-3">
+      <!-- Data Source Toggle (street mode only) -->
+      <div v-if="mapType === 'standard'" class="flex items-center justify-center gap-3 py-3">
         <span class="text-sm font-medium text-white/50">Data source</span>
         <div class="flex rounded-lg overflow-hidden border border-white/[0.08]">
           <button
@@ -75,6 +110,8 @@
         v-if="completed"
         :job-id="jobId"
         :file-info="fileInfo"
+        :job-metadata="jobMetadata"
+        :map-type="mapType"
         :stl-url="downloadUrl"
         :threemf-url="download3mfUrl"
         :slicer-available="slicerAvailable"
@@ -140,6 +177,7 @@ export default {
       scale: 3463,
       sizeCm: 23,
       dataSource: 'overture',
+      mapType: 'standard',
 
       // Map layers
       layers: {
@@ -161,12 +199,15 @@ export default {
       currentStage: null,
       stageMessage: null,
       fileInfo: null,
+      jobMetadata: null,
 
-      // Processing stages
+      // Processing stages — includes both street and terrain stages.
+      // GeneratorProgress shows all stages; inactive ones appear as grey pills.
       stages: [
         { id: 'queued', label: 'Queued' },
         { id: 'fetching_osm', label: 'Fetching OSM' },
         { id: 'fetching_overture', label: 'Fetching Overture' },
+        { id: 'fetching_elevation', label: 'Fetching Elevation' },
         { id: 'converting', label: 'Converting' },
         { id: 'finalizing', label: 'Finalizing' }
       ],
@@ -223,7 +264,8 @@ export default {
           scale: this.scale,
           size_cm: sizeCm,
           data_source: this.dataSource,
-          layers: this.layers
+          layers: this.layers,
+          map_type: this.mapType,
         }
 
         const response = await createMap(params)
@@ -238,6 +280,7 @@ export default {
         this.status = 'completed'
         this.completed = true
         this.fileInfo = result.file_info
+        this.jobMetadata = result.metadata || null
 
         await this.loadHistory()
       } catch (err) {

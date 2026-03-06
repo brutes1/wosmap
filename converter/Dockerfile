@@ -56,7 +56,10 @@ RUN pip3 install --no-cache-dir \
     requests \
     cairosvg \
     svgwrite \
-    overturemaps
+    overturemaps \
+    numpy \
+    Pillow \
+    numpy-stl
 
 # Install Blender from Ubuntu repository (supports ARM64)
 # Note: Ubuntu 22.04 provides Blender 3.0, which is older but works on ARM64
