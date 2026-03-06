@@ -10,7 +10,7 @@ import uuid
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict
+from typing import Literal, Optional, List, Dict
 
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.responses import FileResponse, JSONResponse
@@ -91,6 +91,10 @@ class MapRequest(BaseModel):
     include_buildings: bool = Field(True, description="Whether to include buildings")
     data_source: str = Field("osm", description="Data source: 'osm' or 'overture' (osm_ms accepted for backwards compatibility)")
     layers: Optional[LayerConfig] = Field(default_factory=LayerConfig, description="Map layers to include")
+    map_type: Literal["standard", "terrain"] = Field(
+        "standard",
+        description="Map mode: 'standard' (street map via OSM) or 'terrain' (elevation-only heightmap)"
+    )
 
 
 class MapResponse(BaseModel):
@@ -104,6 +108,7 @@ class JobStatus(BaseModel):
     """Status of a map generation job."""
     job_id: str
     status: str
+    map_type: Optional[str] = "standard"
     stage_message: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
@@ -219,6 +224,7 @@ async def create_map(request: MapRequest):
         "data_source": request.data_source,
         "layers": layers.model_dump(),
         "location_name": location_name,
+        "map_type": request.map_type,
         "created_at": datetime.utcnow().isoformat(),
     }
 
@@ -226,11 +232,12 @@ async def create_map(request: MapRequest):
     r = get_redis()
     r.lpush("map_jobs", json.dumps(job))
 
-    # Store initial status
+    # Store initial status (includes map_type so frontend knows mode immediately)
     r.set(f"result:{job_id}", json.dumps({
         "status": "queued",
         "job_id": job_id,
         "location_name": location_name,
+        "map_type": request.map_type,
         "created_at": job["created_at"],
     }))
 
@@ -303,6 +310,7 @@ async def get_map_status(job_id: str):
     return JobStatus(
         job_id=job_id,
         status=data.get("status", "unknown"),
+        map_type=data.get("map_type", "standard"),
         stage_message=data.get("stage_message"),
         created_at=data.get("created_at"),
         updated_at=data.get("updated_at"),

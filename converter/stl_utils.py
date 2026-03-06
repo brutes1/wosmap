@@ -1,9 +1,39 @@
 """
-STL file utilities for extracting metadata.
+STL file utilities for extracting metadata and writing terrain STL files.
 """
 
 import struct
 from pathlib import Path
+
+import numpy as np
+
+
+def write_terrain_stl(
+    vertices: np.ndarray,
+    faces: np.ndarray,
+    output_path: Path,
+) -> None:
+    """
+    Write a terrain mesh to binary STL using numpy-stl.
+
+    Uses vectorized data['vectors'] = vertices[faces] — no per-triangle loop.
+    Normals are computed automatically by numpy-stl.
+
+    Args:
+        vertices: Float32 array of shape (N, 3) — vertex coordinates in mm
+        faces: Int64 array of shape (M, 3) — triangle indices into vertices
+        output_path: Destination STL file path
+    """
+    from stl import mesh as stl_mesh
+    import stl
+
+    data = np.zeros(len(faces), dtype=stl_mesh.Mesh.dtype)
+    # Fancy indexing: gather all triangle vertices in one vectorized operation
+    data["vectors"] = vertices[faces]
+
+    terrain_mesh = stl_mesh.Mesh(data, remove_empty_areas=False)
+    terrain_mesh.update_normals()
+    terrain_mesh.save(str(output_path), mode=stl.Mode.BINARY)
 
 
 def get_stl_info(stl_path: str) -> dict:

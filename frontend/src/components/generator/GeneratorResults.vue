@@ -28,6 +28,22 @@
           </span>
         </div>
       </div>
+
+      <!-- Terrain elevation stats -->
+      <div v-if="mapType === 'terrain' && jobMetadata" class="mt-3 pt-3 border-t border-white/[0.06] grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+        <div>
+          <span class="text-white/50">Min elevation:</span>
+          <span class="ml-1 font-medium text-white/80">{{ jobMetadata.min_elevation_m }}m</span>
+        </div>
+        <div>
+          <span class="text-white/50">Peak elevation:</span>
+          <span class="ml-1 font-medium text-white/80">{{ jobMetadata.max_elevation_m }}m</span>
+        </div>
+        <div>
+          <span class="text-white/50">Relief range:</span>
+          <span class="ml-1 font-medium text-white/80">{{ jobMetadata.elevation_range_m }}m</span>
+        </div>
+      </div>
     </div>
 
     <!-- Primary Download - ZIP with all files -->
@@ -67,8 +83,8 @@
       </button>
     </div>
 
-    <!-- Multi-Color Section (Collapsible) -->
-    <div class="border border-white/[0.06] rounded-xl overflow-hidden">
+    <!-- Multi-Color Section (Collapsible) — street mode only -->
+    <div v-if="mapType !== 'terrain'" class="border border-white/[0.06] rounded-xl overflow-hidden">
       <button
         @click="showMultiColor = !showMultiColor"
         class="w-full flex items-center justify-between p-4 bg-surface-1 hover:bg-surface-2 transition-colors"
@@ -141,6 +157,14 @@ export default {
     fileInfo: {
       type: Object,
       default: null
+    },
+    jobMetadata: {
+      type: Object,
+      default: null
+    },
+    mapType: {
+      type: String,
+      default: 'standard'
     },
     stlUrl: {
       type: String,

@@ -59,6 +59,7 @@ def process_map_request(job: dict, work_dir: str = "/data/maps", status_callback
     include_buildings = job.get("include_buildings", True)
     data_source = job.get("data_source", "osm")
     location_name = job.get("location_name", "map")
+    map_type = job.get("map_type", "standard")
     layers = job.get("layers", {
         "buildings": True,
         "roads": True,
@@ -90,6 +91,58 @@ def process_map_request(job: dict, work_dir: str = "/data/maps", status_callback
     print(f"  Scale: 1:{scale}, Size: {size_cm}cm, Diameter: {diameter}m")
     print(f"  Bounding box: {bbox}")
     print(f"  Layers: {layers}")
+
+    # -------------------------------------------------------------------------
+    # Terrain mode: bypass OSM/OSM2World/Blender entirely
+    # -------------------------------------------------------------------------
+    if map_type == "terrain":
+        from elevation import fetch_elevation, generate_terrain_stl, write_terrain_meta
+
+        update_stage("fetching_elevation", "Fetching terrain elevation data...")
+        try:
+            elev_data = fetch_elevation(
+                bbox[0], bbox[1], bbox[2], bbox[3]
+            )
+        except Exception as e:
+            raise Exception(f"Failed to fetch elevation data: {e}")
+
+        update_stage("converting", "Generating terrain mesh...")
+        stl_path = job_dir / "map.stl"
+        try:
+            generate_terrain_stl(elev_data, stl_path, scale)
+        except Exception as e:
+            raise Exception(f"Failed to generate terrain mesh: {e}")
+
+        write_terrain_meta(elev_data, job_dir)
+
+        # Fall through to finalization — map-meta.json is read automatically
+        update_stage("finalizing", "Computing file metadata...")
+
+        if not stl_path.exists():
+            raise Exception(f"Terrain STL file not generated at {stl_path}")
+
+        from stl_utils import get_stl_info
+        from datetime import datetime
+
+        stl_info = get_stl_info(str(stl_path))
+        date_str = datetime.utcnow().strftime("%Y-%m-%d")
+        filename = f"wosmap_{location_name}_{date_str}_terrain.stl"
+
+        meta_path = job_dir / "map-meta.json"
+        metadata = json.loads(meta_path.read_text()) if meta_path.exists() else {}
+
+        return {
+            "status": "completed",
+            "job_id": job_id,
+            "files": {"stl": str(stl_path)},
+            "file_info": {"filename": filename, **stl_info},
+            "metadata": metadata,
+            "effective_area": effective_area,
+        }
+
+    # -------------------------------------------------------------------------
+    # Standard street map mode: OSM → OSM2World → Blender pipeline
+    # -------------------------------------------------------------------------
 
     # Step 1: Fetch OSM data
     update_stage("fetching_osm", "Fetching map data from OpenStreetMap...")
